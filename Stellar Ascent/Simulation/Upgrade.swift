@@ -41,7 +41,7 @@ class UpgradePool {
         Upgrade(type: .escapeVelocity, name: "Escape Velocity", description: "Lighter movement mechanics.\nAccel +40%", icon: "arrow.right.circle.fill", color: .mint, rarity: .common, minStage: 0),
         
         Upgrade(type: .neutroniumHull, name: "Neutronium Hull", description: "Become incredibly dense.\nMass +15%, Knockback Resist +50%", icon: "circle.grid.hex.fill", color: .gray, rarity: .rare, minStage: 3),
-        Upgrade(type: .orbitalResonance, name: "Orbital Resonance", description: "Captured moons spin 2x faster and deal contact damage.", icon: "orbit", color: .cyan, rarity: .rare, minStage: 3),
+        Upgrade(type: .orbitalResonance, name: "Orbital Resonance", description: "Captured moons spin 2x faster and deal contact damage.", icon: "circle.dashed", color: .cyan, rarity: .rare, minStage: 3),
         Upgrade(type: .rocheLimit, name: "Roche Limit Breaker", description: "Tidal forces shatter enemies from 50% further away.", icon: "arrow.up.left.and.arrow.down.right", color: .red, rarity: .rare, minStage: 4),
         Upgrade(type: .darkMatterHalo, name: "Dark Matter Halo", description: "Invisible mass increases gravity range by 50%.", icon: "tornado", color: .indigo, rarity: .epic, minStage: 4),
         

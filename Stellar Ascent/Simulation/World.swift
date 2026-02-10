@@ -82,12 +82,19 @@ class World {
         }
 
         // Active Count (Difficulty-scaled spawning)
-        let difficulty = min(1.0, player.mass / 800.0)
+        let difficulty = min(1.0, player.mass / 5000.0)
+        let targetCount = 60 + Int(difficulty * 100)
         
-        if activeCount < 60 + Int(difficulty * 40) {
-            let minR: Float = 700 + difficulty * 200
-            let maxR: Float = 1400 + difficulty * 500
-            if Float.random(in: 0...1) < 0.4 {
+        if activeCount < targetCount {
+            // Spawn strictly outside the view radius to avoid pop-in
+            let viewRadius = (player.radius + 60.0) * 3.0
+            let minR = max(viewRadius, 900.0)
+            let maxR = minR + 1200.0
+            
+            // 30% chance to spawn level-appropriate food/threats
+            if Float.random(in: 0...1) < 0.3 {
+                spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR, scaledTo: player.mass)
+            } else if Float.random(in: 0...1) < 0.4 {
                 spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR, forceSmall: true)
             } else {
                 spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR)

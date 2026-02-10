@@ -168,10 +168,34 @@ extension World {
             let torque = dot(relVel, tangent) * 0.05
             player.spin += torque / player.mass
             
+            let smallAbsorbLimit: Float = 0.20
             let absorbLimit: Float = 0.35
             let shatterThreshold: Float = 650.0
+            let effectiveAbsorbSpeed: Float = (massRatio <= smallAbsorbLimit) ? 1200.0 : shatterThreshold
+
+            func shatterTarget(impactVel: SIMD2<Float>) {
+                if player.gammaBurstChance > 0, Float.random(in: 0...1) < player.gammaBurstChance {
+                    triggerGammaRayBurst(at: (player.pos + e.pos) * 0.5)
+                }
+                let dustMass = e.mass * 0.20
+                player.mass += dustMass
+                player.updateRadius()
+                
+                var tempEntity = entities[targetIndex]
+                tempEntity.mass = e.mass * 0.80
+                
+                let debris = generateDebris(from: tempEntity, impactVel: impactVel)
+                if entities.count + debris.count < 300 {
+                    entities.append(contentsOf: debris)
+                    nextEntityId += debris.count
+                }
+                entities[targetIndex].alive = false
+                events.append(.shatter(pos: e.pos, color: e.color))
+                AudioManager.shared.playEvent("damage")
+                player.vel *= 0.94
+            }
             
-            if massRatio <= absorbLimit && impactSpeed < shatterThreshold {
+            if massRatio <= absorbLimit && impactSpeed < effectiveAbsorbSpeed {
                 if !player.isCompact && player.attachments.count < 30 {
                     let relativePos = e.pos - player.pos
                     let angle = atan2(relativePos.y, relativePos.x)
@@ -212,6 +236,10 @@ extension World {
                 }
                 
                 if massRatio > 0.8 {
+                    if massRatio <= 1.0 && impactSpeed > 350 {
+                        shatterTarget(impactVel: player.vel * 0.4)
+                        return
+                    }
                     let difficulty = min(1.0, player.mass / 800.0)
                     let dmg = impactSpeed * massRatio * SimParams.damageScale * player.defenseMultiplier * (1.0 + difficulty)
                     
@@ -237,25 +265,7 @@ extension World {
                 }
                 
                 if massRatio <= 0.8 {
-                    if player.gammaBurstChance > 0, Float.random(in: 0...1) < player.gammaBurstChance {
-                        triggerGammaRayBurst(at: (player.pos + e.pos) * 0.5)
-                    }
-                    let dustMass = e.mass * 0.20
-                    player.mass += dustMass
-                    player.updateRadius()
-                    
-                    var tempEntity = entities[targetIndex]
-                    tempEntity.mass = e.mass * 0.80
-                    
-                    let debris = generateDebris(from: tempEntity, impactVel: player.vel * 0.4)
-                    if entities.count + debris.count < 300 {
-                        entities.append(contentsOf: debris)
-                        nextEntityId += debris.count
-                    }
-                    entities[targetIndex].alive = false
-                    events.append(.shatter(pos: e.pos, color: e.color))
-                    AudioManager.shared.playEvent("damage")
-                    player.vel *= 0.94
+                    shatterTarget(impactVel: player.vel * 0.4)
                 }
             }
         }

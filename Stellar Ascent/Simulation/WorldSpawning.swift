@@ -13,7 +13,7 @@ extension World {
         }
     }
     
-    func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 600, maxRange: Float = 1400, forceSmall: Bool = false) {
+    func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 600, maxRange: Float = 1400, forceSmall: Bool = false, scaledTo: Float? = nil) {
         var pos = SIMD2<Float>.zero
         var radius: Float = 10.0
         var valid = false
@@ -57,8 +57,24 @@ extension World {
         var mass: Float = 1.0
         var kind: EntityKind = .matter
         var baseColor: SIMD4<Float> = SIMD4<Float>(0.8, 0.4, 0.9, 1.0)
+        let midGame = player.mass >= 450.0 && player.mass < 900.0
         
-        if forceSmall {
+        if let playerMass = scaledTo {
+            let scaleRoll = Float.random(in: 0...100)
+            if scaleRoll < 50 {
+                mass = playerMass * Float.random(in: 0.1...0.3)
+                kind = .matter
+                baseColor = SIMD4<Float>(0.4, 0.8, 0.4, 1.0)
+            } else if scaleRoll < 80 {
+                mass = playerMass * Float.random(in: 0.5...0.9)
+                kind = .hazard
+                baseColor = SIMD4<Float>(0.8, 0.6, 0.2, 1.0)
+            } else {
+                mass = playerMass * Float.random(in: 1.2...2.0)
+                kind = .hazard
+                baseColor = SIMD4<Float>(1.0, 0.2, 0.2, 1.0)
+            }
+        } else if forceSmall {
             mass = Float.random(in: 3...15)
             kind = .matter
             baseColor = SIMD4<Float>(0.55, 0.5, 0.45, 1.0)
@@ -72,20 +88,34 @@ extension World {
                 mass = Float.random(in: 400...1500)
                 baseColor = SIMD4<Float>(1.0, 0.2, 0.1, 1.0)  // Bright red danger
             }
-        } else if roll < 70 {
-            mass = Float.random(in: 1...5)
+        } else if midGame {
+            if roll < 55 {
+                mass = Float.random(in: 1...6)
+                kind = .matter
+                baseColor = SIMD4<Float>(0.55, 0.5, 0.45, 1.0)
+            } else if roll < 85 {
+                mass = Float.random(in: 12...40)
+                kind = .hazard
+                baseColor = SIMD4<Float>(0.6, 0.6, 0.65, 1.0)
+            } else if roll < 98 {
+                mass = Float.random(in: 50...180)
+                kind = .hazard
+                baseColor = SIMD4<Float>(0.3, 0.6, 0.8, 1.0)
+            } else {
+                mass = Float.random(in: 250...450)
+                kind = .hazard
+                baseColor = SIMD4<Float>(0.9, 0.6, 0.3, 1.0)
+            }
+        } else if roll < 60 {
+            mass = Float.random(in: 5...25)
             kind = .matter
             baseColor = SIMD4<Float>(0.55, 0.5, 0.45, 1.0)
         } else if roll < 90 {
-            mass = Float.random(in: 12...35)
+            mass = Float.random(in: 30...150)
             kind = .hazard
             baseColor = SIMD4<Float>(0.6, 0.6, 0.65, 1.0)
-        } else if roll < 98 {
-            mass = Float.random(in: 40...120)
-            kind = .hazard
-            baseColor = SIMD4<Float>(0.3, 0.6, 0.8, 1.0)
         } else {
-            mass = Float.random(in: 300...800)
+            mass = Float.random(in: 200...600)
             kind = .hazard
             baseColor = SIMD4<Float>(0.9, 0.6, 0.3, 1.0)
         }
