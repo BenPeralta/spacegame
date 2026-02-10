@@ -5,12 +5,15 @@ import simd
 extension World {
     
     func spawnInitialMatter() {
-        for _ in 0..<40 {
-            spawnRandomEntity(near: .zero, minRange: 500, maxRange: 3000)
+        for _ in 0..<80 {
+            spawnRandomEntity(near: .zero, minRange: 400, maxRange: 1200)
+        }
+        for _ in 0..<20 {
+            spawnRandomEntity(near: .zero, minRange: 1500, maxRange: 2500)
         }
     }
     
-    func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 1000, maxRange: Float = 2000) {
+    func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 600, maxRange: Float = 1400) {
         var pos = SIMD2<Float>.zero
         var radius: Float = 10.0
         var valid = false
@@ -40,6 +43,11 @@ extension World {
         }
         
         if !valid { return }
+        
+        if Float.random(in: 0...1) < 0.3 {
+            spawnCluster(at: pos)
+            return
+        }
         
         // GIANT IMPACTS: Rogue asteroids on collision course
         let rogueChance: Float = player.mass < 600 ? 0.05 : 0.03
@@ -130,5 +138,31 @@ extension World {
         
         entities.append(e)
         nextEntityId += 1
+    }
+    
+    func spawnCluster(at center: SIMD2<Float>) {
+        let count = Int.random(in: 3...6)
+        for _ in 0..<count {
+            let offset = SIMD2<Float>(Float.random(in: -50...50), Float.random(in: -50...50))
+            let mass = Float.random(in: 1...5)
+            let vel = SIMD2<Float>(Float.random(in: -20...20), Float.random(in: -20...20))
+            
+            let e = Entity(
+                id: nextEntityId,
+                kind: .matter,
+                pos: center + offset,
+                vel: vel,
+                mass: mass,
+                radius: SimParams.radiusForMass(mass),
+                health: mass,
+                color: SIMD4<Float>(0.6, 0.6, 0.6, 1.0),
+                alive: true,
+                rotation: Float.random(in: 0...Float.pi * 2.0),
+                spin: Float.random(in: -3...3),
+                visualType: .rock
+            )
+            entities.append(e)
+            nextEntityId += 1
+        }
     }
 }

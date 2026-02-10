@@ -72,7 +72,7 @@ class World {
         }
         
         // Despawn Far Entities
-        let despawnDist: Float = 3500.0
+        let despawnDist: Float = 2000.0
         for i in 0..<entities.count {
             if entities[i].alive {
                 if distance(entities[i].pos, player.pos) > despawnDist {
@@ -85,8 +85,8 @@ class World {
         let difficulty = min(1.0, player.mass / 800.0)
         
         if activeCount < 60 + Int(difficulty * 40) {
-            let minR = 1200 + difficulty * 1500
-            let maxR = 3500 + difficulty * 2000
+            let minR: Float = 700 + difficulty * 200
+            let maxR: Float = 1400 + difficulty * 500
             spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR)
         }
         
@@ -99,6 +99,17 @@ class World {
         if !gameOver {
             applyPlayerMovement(dt: dt, input: input)
             checkTier()
+            
+            // Update orbiting attachments
+            for i in 0..<player.attachments.count {
+                var att = player.attachments[i]
+                att.angle += att.orbitSpeed * dt
+                att.offset = SIMD2<Float>(
+                    cos(att.angle) * att.orbitDist,
+                    sin(att.angle) * att.orbitDist
+                )
+                player.attachments[i] = att
+            }
         }
         
         // 3. Query Neighbors

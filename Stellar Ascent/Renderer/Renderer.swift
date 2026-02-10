@@ -111,11 +111,20 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     // MARK: - Update Data (Called from Game Loop)
-    func update(instances: [InstanceData], camera: SIMD2<Float>, zoom: Float, time: Float, flashIntensity: Float) {
+    func update(instances: [InstanceData], camera: SIMD2<Float>, zoom: Float, time: Float, flashIntensity: Float, playerVel: SIMD2<Float>, playerPos: SIMD2<Float>) {
         self.cameraPos = camera
         self.zoom = zoom
         self.simTime = time
         self.flashIntensity = flashIntensity
+        
+        // Auto trail
+        let speed = length(playerVel)
+        if speed > 50.0 {
+            let dir = normalize(playerVel)
+            let trailPos = playerPos - (dir * 30.0)
+            let trailDir = -dir
+            particleSystem?.emit(pos: trailPos, count: 2, color: .zero, speed: speed, type: "trail", direction: trailDir)
+        }
         
         // Merge Particles (Draw particles BEHIND entities)
         var allInstances: [InstanceData] = []

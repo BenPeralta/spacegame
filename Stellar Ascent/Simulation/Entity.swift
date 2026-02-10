@@ -35,6 +35,11 @@ struct Entity {
 }
 struct Attachment {
     var offset: SIMD2<Float>
+    
+    var angle: Float
+    var orbitDist: Float
+    var orbitSpeed: Float
+    
     var radius: Float
     var color: SIMD4<Float>
     var seed: Float

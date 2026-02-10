@@ -8,6 +8,7 @@ struct Particle {
     var size: Float
     var life: Float
     var maxLife: Float
+    var type: Int32
 }
 
 class ParticleSystem {
@@ -34,37 +35,54 @@ class ParticleSystem {
             }
             
             particles[i].position += particles[i].velocity * dt
-            particles[i].velocity *= 0.95 // Drag
+            
+            if particles[i].type == 6 {
+                particles[i].size += 15.0 * dt
+                let progress = 1.0 - (particles[i].life / particles[i].maxLife)
+                if progress > 0.2 {
+                    particles[i].color.x *= 0.95
+                    particles[i].color.y *= 0.90
+                }
+            } else {
+                particles[i].velocity *= 0.95
+            }
         }
     }
     
-    func emit(pos: SIMD2<Float>, count: Int, color: SIMD4<Float>, speed: Float, type: String) {
+    func emit(pos: SIMD2<Float>, count: Int, color: SIMD4<Float>, speed: Float, type: String, direction: SIMD2<Float> = .zero) {
         if particles.count + count > maxParticles { return }
         
         for _ in 0..<count {
-            let angle = Float.random(in: 0...Float.pi * 2)
-            let velDir = SIMD2<Float>(cos(angle), sin(angle))
-            // Random speed
-            let s = Float.random(in: speed * 0.5 ... speed * 1.5)
-            
             var p = Particle(
                 position: pos,
-                velocity: velDir * s,
+                velocity: .zero,
                 color: color,
-                size: Float.random(in: 2...5),
-                life: Float.random(in: 0.5...1.0),
-                maxLife: 1.0
+                size: 1.0,
+                life: 1.0,
+                maxLife: 1.0,
+                type: 0
             )
             
             // Custom behavior based on type
             if type == "absorb" {
-                // Implosion? Or just sucky dust?
-                // For consume pop: maybe outward bang then fade
-                p.velocity = velDir * s
+                let angle = Float.random(in: 0...Float.pi * 2)
+                let velDir = SIMD2<Float>(cos(angle), sin(angle))
+                p.velocity = velDir * Float.random(in: 50...150)
+                p.color = color
+                p.size = Float.random(in: 3...6)
+                p.life = 0.5
+                p.type = 0
             } else if type == "trail" {
-                p.velocity = -velDir * s * 0.2 // Small drift
-                p.life = 0.3
-                p.size = 3.0
+                p.color = SIMD4<Float>(1.0, 0.8, 0.2, 1.0)
+                let jitter = SIMD2<Float>(Float.random(in: -8...8), Float.random(in: -8...8))
+                p.position = pos + jitter
+                if length(direction) > 0.001 {
+                    p.velocity = normalize(direction) * speed * 0.1
+                }
+                p.velocity += SIMD2<Float>(Float.random(in: -10...10), Float.random(in: -10...10))
+                p.size = Float.random(in: 12...22)
+                p.life = Float.random(in: 0.2...0.4)
+                p.type = 6
             }
             
             particles.append(p)
@@ -86,12 +104,12 @@ class ParticleSystem {
                 velocity: .zero,
                 radius: p.size,
                 color: c,
-                glowIntensity: 0.8,
+                glowIntensity: p.type == 6 ? 1.0 : 0.8,
                 seed: Float.random(in: 0...1),
                 crackColor: .zero,
                 crackIntensity: 0.0,
-                rotation: 0.0,
-                type: 0,
+                rotation: Float.random(in: 0...Float.pi * 2.0),
+                type: p.type,
                 time: 0.0
             ))
         }

@@ -47,7 +47,6 @@ class GameViewController: UIViewController {
     var displayLink: CADisplayLink?
     var lastFrameTime: CFTimeInterval = 0
     var lastHapticTime: CFTimeInterval = 0 // Throttle haptics
-    var frameCounter: Int = 0 // For trail throttling
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -143,7 +142,7 @@ class GameViewController: UIViewController {
                  let camera = world.player.pos
                  let targetZoom = 100.0 / (world.player.radius + 60.0)
                  let zoom: Float = max(0.15, min(2.0, targetZoom))
-                 renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity)
+                 renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos)
             }
             return
         }
@@ -193,11 +192,7 @@ class GameViewController: UIViewController {
         // Update Particles (CPU)
         renderer.particleSystem?.update(dt: clampedDT)
         
-        // Add Player Trail (OPTIMIZED: Every 3rd frame)
-        frameCounter += 1
-        if length(world.player.vel) > 10.0 && frameCounter % 3 == 0 {
-            renderer.handleEvent(type: "trail", pos: world.player.pos, color: world.player.color)
-        }
+        // Trail now handled in Renderer.update
         
         // Update Coordinator State
         if world.player.abilityCooldown > 0 {
@@ -235,7 +230,7 @@ class GameViewController: UIViewController {
         let targetZoom = 100.0 / (world.player.radius + 60.0)
         let zoom: Float = max(0.15, min(2.0, targetZoom))
         
-        renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity)
+        renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos)
     }
     
     // MARK: - Restart

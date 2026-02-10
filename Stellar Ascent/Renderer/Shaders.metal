@@ -86,7 +86,7 @@ vertex VertexOut vertexShader(uint vertexID [[vertex_id]],
 fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uniforms [[buffer(1)]]) {
     // 1. Circle Cutout
     float dist = length(in.uv);
-    if (dist > 1.0) discard_fragment();
+    if (in.type != 6 && dist > 1.0) discard_fragment();
     
     // 2. Rotate UVs for Texture (THIS MAKES IT SPIN)
     float c = cos(in.rotation);
@@ -96,7 +96,7 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uni
     
     // 3. Lighting (Fake 3D Sphere)
     // Calculate normal of a sphere at this pixel
-    float z = sqrt(1.0 - dist * dist);
+    float z = sqrt(max(0.0, 1.0 - dist * dist));
     float3 normal = float3(rotatedUV, z);
     
     // Light source from top-left
@@ -108,7 +108,15 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uni
     float alpha = 1.0;
 
     // 4. Procedural Textures based on Type
-    if (in.type == 5) { // BLACK HOLE
+    if (in.type == 6) { // TRAIL
+        float core = 1.0 - smoothstep(0.0, 0.2, dist);
+        float glow = 1.0 - smoothstep(0.0, 1.0, dist);
+        float noiseVal = fbm(in.uv * 2.0 - float2(0, in.time * 3.0));
+        finalColor = in.color.rgb + float3(0.5, 0.5, 0.2) * core;
+        finalColor += in.color.rgb * noiseVal * 0.5;
+        alpha = glow * in.color.a * (0.5 + noiseVal * 0.5);
+        light = 1.0;
+    } else if (in.type == 5) { // BLACK HOLE
         // Accretion Disk (Bright Ring)
         float ring = smoothstep(0.5, 0.7, dist) * (1.0 - smoothstep(0.8, 1.0, dist));
         // Event Horizon (Black Center)

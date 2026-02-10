@@ -74,7 +74,7 @@ extension World {
         }
     }
     
-    // MARK: Player Collision
+    // MARK: Player Collision (FIXED: No more God Mode)
     func resolveCollision(targetIndex: Int) {
         let dist = distance(player.pos, entities[targetIndex].pos)
         let combinedRadius = player.radius + entities[targetIndex].radius
@@ -84,12 +84,11 @@ extension World {
             let relVel = player.vel - e.vel
             let impactSpeed = length(relVel)
             let massRatio = e.mass / player.mass
-
-            // Black hole behavior: consume without shatter/bounce
+            
+            // Black hole behavior (Unchanged)
             if player.tier >= 5 {
                 let pullDir = normalize(player.pos - e.pos)
                 entities[targetIndex].vel += pullDir * 1000.0 * 0.016
-                
                 if dist < player.radius * 0.5 {
                     entities[targetIndex].alive = false
                     player.mass += e.mass * 0.1
@@ -98,21 +97,26 @@ extension World {
                 }
             }
             
-            // Spin physics (torque)
+            // Spin physics (Unchanged)
             let normal = normalize(player.pos - e.pos)
             let tangent = SIMD2<Float>(-normal.y, normal.x)
             let torque = dot(relVel, tangent) * 0.05
             player.spin += torque / player.mass
             
-            // Drifter Star logic: high speed breaks, low speed latches/absorbs
-            let shatterThreshold: Float = 300.0
+            let shatterThreshold: Float = 250.0
             
             if massRatio <= SimParams.absorbRatio && impactSpeed < shatterThreshold {
-                // Latching (only before compact)
                 if !player.isCompact && player.attachments.count < 30 {
-                    let attachPos = e.pos - player.pos
+                    let relativePos = e.pos - player.pos
+                    let angle = atan2(relativePos.y, relativePos.x)
+                    let dist = max(1.0, length(relativePos))
+                    let direction: Float = Float.random(in: 0...1) > 0.5 ? 1.0 : -1.0
+                    let speed = (Float.random(in: 0.5...1.5) / sqrt(dist / 50.0)) * direction
                     let att = Attachment(
-                        offset: attachPos,
+                        offset: relativePos,
+                        angle: angle,
+                        orbitDist: dist,
+                        orbitSpeed: speed,
                         radius: e.radius,
                         color: e.color,
                         seed: Float(e.id),
@@ -121,27 +125,48 @@ extension World {
                     player.attachments.append(att)
                 }
                 
-                // Absorb
                 player.mass += e.mass
                 player.updateRadius()
                 player.health = min(player.health + e.mass * 0.1, player.maxHealth)
-                
                 entities[targetIndex].alive = false
                 events.append(.absorb(pos: e.pos, color: e.color))
                 AudioManager.shared.playEvent("absorb")
             } else {
-                // Collision / shatter
-                let difficulty = min(1.0, player.mass / 800.0)
-                let dmg = impactSpeed * massRatio * SimParams.damageScale * player.defenseMultiplier * (1.0 + difficulty)
-                
-                if player.invulnTime <= 0 {
-                    player.health -= dmg
-                    player.invulnTime = 0.2
-                    events.append(.damage(pos: (player.pos + e.pos) * 0.5))
+                if massRatio > 1.2 && impactSpeed > 150 {
+                    events.append(.shatter(pos: player.pos, color: player.color))
+                    createPlayerDebris()
+                    player.health = 0
+                    gameOver = true
                     AudioManager.shared.playEvent("damage")
+                    return
                 }
                 
-                if impactSpeed > 150 || massRatio < 0.5 {
+                if massRatio > 0.8 {
+                    let difficulty = min(1.0, player.mass / 800.0)
+                    let dmg = impactSpeed * massRatio * SimParams.damageScale * player.defenseMultiplier * (1.0 + difficulty)
+                    
+                    if player.invulnTime <= 0 {
+                        player.health -= dmg
+                        player.invulnTime = 0.2
+                        events.append(.damage(pos: (player.pos + e.pos) * 0.5))
+                        AudioManager.shared.playEvent("damage")
+                    }
+                    
+                    let impulse = normal * (impactSpeed * 0.8)
+                    player.vel += impulse / player.mass
+                    entities[targetIndex].vel -= impulse / e.mass
+                    
+                    let overlap = combinedRadius - dist
+                    player.pos += normal * (overlap * 0.5)
+                    
+                    if player.health <= 0 {
+                        createPlayerDebris()
+                        gameOver = true
+                    }
+                    return
+                }
+                
+                if impactSpeed > 100 || massRatio < 0.5 {
                     let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.5)
                     if entities.count + debris.count < 300 {
                         entities.append(contentsOf: debris)
@@ -149,20 +174,7 @@ extension World {
                     }
                     entities[targetIndex].alive = false
                     events.append(.shatter(pos: e.pos, color: e.color))
-                    player.vel *= 0.9
-                } else {
-                    // Bounce
-                    let impulse = normal * (impactSpeed * 0.8)
-                    player.vel += impulse / player.mass
-                    entities[targetIndex].vel -= impulse / e.mass
-                    
-                    let overlap = combinedRadius - dist
-                    player.pos += normal * (overlap * 0.5)
-                }
-                
-                if player.health <= 0 {
-                    createPlayerDebris()
-                    gameOver = true
+                    player.vel *= 0.95
                 }
             }
         }
