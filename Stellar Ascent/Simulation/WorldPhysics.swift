@@ -64,7 +64,11 @@ extension World {
         let rocheLimit = player.radius * 2.5
         
         if dist < rocheLimit && e.mass < player.mass * 0.1 {
-            shatterEntity(index: targetIndex, impactVel: player.vel * 0.1)
+            let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.1)
+            if entities.count + debris.count < 300 {
+                entities.append(contentsOf: debris)
+                nextEntityId += debris.count
+            }
             entities[targetIndex].alive = false
             events.append(.shatter(pos: e.pos, color: e.color))
         }
@@ -138,7 +142,11 @@ extension World {
                 }
                 
                 if impactSpeed > 150 || massRatio < 0.5 {
-                    shatterEntity(index: targetIndex, impactVel: player.vel * 0.5)
+                    let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.5)
+                    if entities.count + debris.count < 300 {
+                        entities.append(contentsOf: debris)
+                        nextEntityId += debris.count
+                    }
                     entities[targetIndex].alive = false
                     events.append(.shatter(pos: e.pos, color: e.color))
                     player.vel *= 0.9
@@ -160,8 +168,10 @@ extension World {
         }
     }
     
-    // MARK: Entity-Entity Collisions
+    // MARK: Entity-Entity Collisions (CRASH FIXED)
     func resolveEntityCollisions() {
+        var newDebris: [Entity] = []
+        
         for i in 0..<entities.count {
             if !entities[i].alive { continue }
             
@@ -187,10 +197,12 @@ extension World {
                     
                     if impactSpeed > 200 {
                         if mi > mj {
-                            shatterEntity(index: j, impactVel: entities[i].vel * 0.5)
+                            let debris = generateDebris(from: entities[j], impactVel: entities[i].vel * 0.5)
+                            newDebris.append(contentsOf: debris)
                             entities[j].alive = false
                         } else {
-                            shatterEntity(index: i, impactVel: entities[j].vel * 0.5)
+                            let debris = generateDebris(from: entities[i], impactVel: entities[j].vel * 0.5)
+                            newDebris.append(contentsOf: debris)
                             entities[i].alive = false
                         }
                         events.append(.shatter(pos: (entities[i].pos + entities[j].pos) * 0.5, color: SIMD4(1, 1, 1, 1)))
@@ -216,23 +228,34 @@ extension World {
                 }
             }
         }
+        
+        if !newDebris.isEmpty {
+            if entities.count + newDebris.count < 300 {
+                entities.append(contentsOf: newDebris)
+                nextEntityId += newDebris.count
+            }
+        }
     }
     
-    // MARK: Shatter Helper
-    func shatterEntity(index: Int, impactVel: SIMD2<Float>) {
-        let e = entities[index]
+    // MARK: Safe Debris Generator
+    func generateDebris(from e: Entity, impactVel: SIMD2<Float>) -> [Entity] {
+        var debrisList: [Entity] = []
         let pieces = Int.random(in: 2...4)
         let pieceMass = e.mass / Float(pieces)
         
+        if pieceMass < 0.5 { return [] }
+        
+        var idBase = nextEntityId
         for _ in 0..<pieces {
             let angle = Float.random(in: 0...Float.pi * 2.0)
             let dir = SIMD2<Float>(cos(angle), sin(angle))
             let speed = Float.random(in: 50...200)
+            let spawnPos = e.pos + dir * (e.radius * 0.8)
             
             let debris = Entity(
-                id: nextEntityId,
+                id: idBase,
                 kind: .matter,
-                pos: e.pos + dir * e.radius * 0.5,
+                pos: spawnPos,
                 vel: e.vel + impactVel * 0.3 + dir * speed,
                 mass: pieceMass,
                 radius: SimParams.radiusForMass(pieceMass),
@@ -243,9 +266,10 @@ extension World {
                 spin: Float.random(in: -5...5),
                 visualType: e.visualType
             )
-            entities.append(debris)
-            nextEntityId += 1
+            debrisList.append(debris)
+            idBase += 1
         }
+        return debrisList
     }
     
     // MARK: Player Death

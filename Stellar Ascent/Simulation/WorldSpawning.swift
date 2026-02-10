@@ -112,18 +112,20 @@ extension World {
             color: color,
             alive: true,
             rotation: Float.random(in: 0...Float.pi * 2.0),
-            spin: Float.random(in: -1...1),
+            spin: Float.random(in: -2.0...2.0),
             visualType: .rock
         )
         
-        if e.mass < 50 {
-            e.visualType = .rock
-        } else if e.mass < 300 {
-            e.visualType = .ice
-        } else if e.mass < 1000 {
-            e.visualType = .gas
-        } else {
+        if e.mass > 800 {
             e.visualType = .star
+        } else if e.mass > 300 {
+            e.visualType = .gas
+        } else if e.mass > 100 {
+            e.visualType = .ice
+        } else if Float.random(in: 0...1) > 0.7 {
+            e.visualType = .lava
+        } else {
+            e.visualType = .rock
         }
         
         entities.append(e)

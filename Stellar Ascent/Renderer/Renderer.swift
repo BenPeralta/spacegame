@@ -21,6 +21,7 @@ struct Uniforms {
     var viewMatrix: simd_float4x4
     var time: Float
     var screenSize: SIMD2<Float>
+    var flashIntensity: Float
 }
 
 private func makeOrtho(left: Float, right: Float, bottom: Float, top: Float, near: Float, far: Float) -> simd_float4x4 {
