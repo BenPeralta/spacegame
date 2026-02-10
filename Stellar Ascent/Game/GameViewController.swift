@@ -115,8 +115,8 @@ class GameViewController: UIViewController {
         
         // World Callbacks
         world.onEvolutionTrigger = { [weak self] in
-            let tier = self?.world.player.stageIndex ?? 0
-            let options = UpgradePool.shared.getOptions(for: tier)
+            let stageIndex = self?.world.player.stageIndex ?? 0
+            let options = UpgradePool.shared.getOptions(for: stageIndex)
             DispatchQueue.main.async {
                 self?.coordinator?.showEvolutionSelection = true
                 self?.coordinator?.currentUpgradeOptions = options

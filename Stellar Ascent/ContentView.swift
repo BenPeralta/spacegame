@@ -255,6 +255,10 @@ struct AbilityButtonView: View {
 struct EvolutionProgressBar: View {
     let currentMass: Float
     
+    @State private var previousMass: Float = 0
+    @State private var barScale: CGFloat = 1.0
+    @State private var flashOpacity: Double = 0.0
+    
     var stageInfo: (current: Progression.Stage, next: Progression.Stage?, progress: Float) {
         let current = Progression.getStage(mass: currentMass)
         let next = Progression.getNextStage(mass: currentMass)
@@ -277,7 +281,22 @@ struct EvolutionProgressBar: View {
         VStack(alignment: .leading, spacing: 3) {
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
-                    Capsule().fill(Color.white.opacity(0.15))
+                    Capsule()
+                        .fill(Color.black.opacity(0.5))
+                        .overlay(
+                            Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        )
+                    
+                    HStack(spacing: 0) {
+                        Spacer()
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1, height: 4)
+                        Spacer()
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1, height: 4)
+                        Spacer()
+                        Rectangle().fill(Color.white.opacity(0.1)).frame(width: 1, height: 4)
+                        Spacer()
+                    }
+                    
                     Capsule()
                         .fill(LinearGradient(
                             gradient: Gradient(colors: getColors(for: info.current.name)),
@@ -285,27 +304,64 @@ struct EvolutionProgressBar: View {
                             endPoint: .trailing
                         ))
                         .frame(width: geo.size.width * CGFloat(info.progress))
-                        .animation(.linear(duration: 0.2), value: info.progress)
-                    Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1)
+                        .animation(.spring(response: 0.4, dampingFraction: 0.7), value: info.progress)
+                    
+                    Capsule()
+                        .fill(Color.white)
+                        .frame(width: geo.size.width * CGFloat(info.progress))
+                        .opacity(flashOpacity)
+                        .blur(radius: 2)
+                    
+                    if info.progress > 0 {
+                        Circle()
+                            .fill(Color.white)
+                            .frame(width: 4, height: 4)
+                            .offset(x: geo.size.width * CGFloat(info.progress) - 2)
+                            .shadow(color: .white, radius: 2)
+                            .animation(.spring(response: 0.4, dampingFraction: 0.7), value: info.progress)
+                    }
                 }
             }
-            .frame(height: 8)
+            .frame(height: 10)
+            .scaleEffect(barScale)
             
             HStack {
                 Text(info.current.name)
                     .font(.system(size: 10, weight: .bold))
                     .foregroundColor(.white.opacity(0.8))
+                    .shadow(color: .black, radius: 1)
                 Spacer()
                 if let next = info.next {
                     Text("Next: \(next.name)")
                         .font(.system(size: 10, weight: .bold))
-                        .foregroundColor(.white.opacity(0.5))
+                        .foregroundColor(getNextColor(for: next.name))
+                        .shadow(color: .black, radius: 1)
                 } else {
-                    Text("CRITICAL MASS IMMINENT")
+                    Text("CRITICAL MASS")
                         .font(.system(size: 10, weight: .black))
                         .foregroundColor(.red)
                 }
             }
+        }
+        .onChange(of: currentMass) { newMass in
+            let diff = newMass - previousMass
+            if diff > 1.0 {
+                withAnimation(.spring(response: 0.2, dampingFraction: 0.5)) {
+                    barScale = 1.15
+                    flashOpacity = 0.6
+                }
+                
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+                    withAnimation {
+                        barScale = 1.0
+                        flashOpacity = 0.0
+                    }
+                }
+            }
+            previousMass = newMass
+        }
+        .onAppear {
+            previousMass = currentMass
         }
     }
     
@@ -313,6 +369,15 @@ struct EvolutionProgressBar: View {
         if name.contains("Star") { return [.orange, .red] }
         if name.contains("Neutron") { return [.cyan, .white] }
         if name.contains("Black") { return [.purple, .black] }
-        return [.blue, .green]
+        if name.contains("Gas") { return [.orange, .yellow] }
+        if name.contains("Rocky") { return [.brown, .orange] }
+        if name.contains("Dwarf Planet") { return [.blue, .cyan] }
+        return [.blue, .purple]
+    }
+    
+    func getNextColor(for name: String) -> Color {
+        if name.contains("Star") { return .yellow }
+        if name.contains("Black") { return .purple }
+        return .white.opacity(0.5)
     }
 }

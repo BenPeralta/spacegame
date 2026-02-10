@@ -324,7 +324,7 @@ extension World {
         case .magnetosphere:
             player.defenseMultiplier *= 0.8
         case .neutroniumHull:
-            player.mass *= 1.2
+            player.mass *= 1.15
             player.updateRadius()
             player.knockbackResist += 0.5
             player.maxHealth *= 1.5
