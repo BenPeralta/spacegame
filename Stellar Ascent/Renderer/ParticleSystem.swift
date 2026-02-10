@@ -89,7 +89,10 @@ class ParticleSystem {
                 glowIntensity: 0.8,
                 seed: Float.random(in: 0...1),
                 crackColor: .zero,
-                crackIntensity: 0.0
+                crackIntensity: 0.0,
+                rotation: 0.0,
+                type: 0,
+                time: 0.0
             ))
         }
         return instances

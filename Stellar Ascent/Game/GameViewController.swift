@@ -102,7 +102,7 @@ class GameViewController: UIViewController {
             self?.restartGame() // Ensure fresh start
         }
         
-        coordinator.onQuitGame = { [weak self] in
+        coordinator.onQuitGame = {
             // Stop logic? Just rely on state
         }
         
@@ -143,7 +143,7 @@ class GameViewController: UIViewController {
                  let camera = world.player.pos
                  let targetZoom = 100.0 / (world.player.radius + 60.0)
                  let zoom: Float = max(0.15, min(2.0, targetZoom))
-                 renderer.update(instances: instances, camera: camera, zoom: zoom)
+                 renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity)
             }
             return
         }
@@ -173,7 +173,7 @@ class GameViewController: UIViewController {
                 createExplosion(at: pos, color: color)
                 // NO haptic - shatter events fire too frequently
                 
-            case .evolve(let tier):
+            case .evolve:
                 // Visual fanfare for evolution
                 triggerHaptic(style: .heavy)
                 // Maybe a screen flash or particle effect here?
@@ -235,7 +235,7 @@ class GameViewController: UIViewController {
         let targetZoom = 100.0 / (world.player.radius + 60.0)
         let zoom: Float = max(0.15, min(2.0, targetZoom))
         
-        renderer.update(instances: instances, camera: camera, zoom: zoom)
+        renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity)
     }
     
     // MARK: - Restart

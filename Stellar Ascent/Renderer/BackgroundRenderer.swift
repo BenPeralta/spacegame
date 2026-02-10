@@ -111,7 +111,7 @@ class BackgroundRenderer {
         encoder?.pushDebugGroup("Nebula")
         encoder?.setRenderPipelineState(nebulaPipeline)
         encoder?.setVertexBytes(&vertUniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
-        encoder?.setFragmentBytes(&vertUniforms, length: MemoryLayout<Uniforms>.stride, index: 1) // Fix: Bind to Fragment too
+        encoder?.setFragmentBytes(&vertUniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         encoder?.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4)
         encoder?.popDebugGroup()
         

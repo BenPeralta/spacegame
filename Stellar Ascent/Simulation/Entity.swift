@@ -8,6 +8,15 @@ enum EntityKind {
     case projectile // Shots fired by player/enemies
 }
 
+enum VisualType: Int {
+    case rock = 0
+    case ice = 1
+    case lava = 2
+    case gas = 3
+    case star = 4
+    case blackHole = 5
+}
+
 struct Entity {
     var id: Int
     var kind: EntityKind
@@ -18,10 +27,16 @@ struct Entity {
     var health: Float
     var color: SIMD4<Float> // Visuals
     var alive: Bool = true
+    
+    // Drifter Star mechanics
+    var rotation: Float = 0.0 // Angle in radians
+    var spin: Float = 0.0     // Angular velocity
+    var visualType: VisualType = .rock
 }
 struct Attachment {
     var offset: SIMD2<Float>
     var radius: Float
     var color: SIMD4<Float>
     var seed: Float
+    var visualType: VisualType = .rock
 }

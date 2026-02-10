@@ -1,6 +1,6 @@
 # Stellar Ascent - Visual Design System
 
-**Version**: 3.0  
+**Version**: 3.1  
 **Last Updated**: 2026-02-10
 
 ---
@@ -27,6 +27,20 @@
 **Appearance**: Advanced patterns, glowing  
 **Color**: Persistent from previous choices  
 **Purpose**: Cosmic horror - one mistake = death
+
+---
+
+## Drifter Star Visuals (v3.1)
+
+### Spin & Rotation
+- **Player and entities now spin** based on collision torque.
+- **Rotation is visual**: surface textures rotate in the shader (planet bands, noise, and craters).
+- **Goal**: You can *see* angular momentum from impacts, matching Drifter Star mechanics.
+
+### Procedural Visual Types
+- Shader uses **type-based** procedural surfaces:
+  - `rock`, `ice`, `lava`, `gas`, `star`, `blackHole`
+- **Black Hole** visuals: event horizon core + glowing accretion ring (no standard lighting).
 
 ---
 
@@ -62,9 +76,9 @@ if player.evoHistory.count > 1, let lastPath = player.evoHistory.dropLast().last
 ### Evolution Paths
 | Path | Base Color | Crack Color | Description |
 |------|------------|-------------|-------------|
-| **Cradle of Life** | `(0.3, 0.8, 0.4)` Green | `(0.2, 1.0, 0.4)` Bright green | Lush habitable world |
-| **Frozen Fortress** | `(0.6, 0.8, 1.0)` Ice blue | `(0.4, 0.9, 1.0)` Bright blue | Icy fortress |
-| **War Planet** | `(0.9, 0.3, 0.2)` Red | `(1.0, 0.4, 0.2)` Bright red | Scarred hellworld |
+| **Accretion Disk** (Cradle of Life) | `(0.3, 0.8, 0.4)` Green | `(0.2, 1.0, 0.4)` Bright green | Gravity-heavy evolution |
+| **Zero Kelvin Crust** (Frozen Fortress) | `(0.6, 0.8, 1.0)` Ice blue | `(0.4, 0.9, 1.0)` Bright blue | Dense defensive shell |
+| **Stellar Ignition** (War Planet) | `(0.9, 0.3, 0.2)` Red | `(1.0, 0.4, 0.2)` Bright red | Aggressive damage path |
 | **Lava** | `(0.9, 0.5, 0.2)` Orange | `(1.0, 0.6, 0.1)` Bright orange | Molten surface |
 | **Rings** | `(0.7, 0.7, 0.9)` Purple | `(0.8, 0.8, 1.0)` Bright purple | Ringed gas giant |
 | **Red Dwarf** | `(0.9, 0.3, 0.2)` Red | `(1.0, 0.4, 0.2)` Bright red | Small star |
@@ -79,7 +93,7 @@ if player.evoHistory.count > 1, let lastPath = player.evoHistory.dropLast().last
 - **Player**: Path-unique appearance (life/ice/war patterns)
 - **Hazards**: Real solar system variety (Earth, Jupiter, Mars, etc.)
 
-### Planet Patterns (Shaders.metal:L154-178)
+### Planet Patterns (Shaders.metal)
 
 **Gas Giants** (radius >100):
 ```metal
@@ -135,13 +149,14 @@ player.attachments.removeAll()
 
 ## Implementation Status
 
-### ✅ Completed (v3.0)
+### ✅ Completed (v3.1)
 1. **Color persistence**: Removed all overrides, colors stick forever
 2. **Hybrid blending**: 50/50 mix for multi-path evolution
 3. **Clean merge at tier 1**: Solid sphere at mass ≥25
 4. **Realistic planet shaders**: Earth, Jupiter, Saturn, ice giants, Mars, Venus
-5. **Astrophysics mechanics**: Tidal disruption, rogue asteroids
-6. **Power-up timing**: Milestone-based (fires exactly at 25, 60, 1000)
+5. **Drifter Star spin**: collision torque → visible rotation
+6. **Drifter Star shatter logic**: speed-based breaking instead of always-absorb
+7. **Power-up timing**: Milestone-based (fires exactly at 25, 60, 1000)
 
 ### 🔄 Future Enhancements
 1. **Player-specific shader patterns**: Separate player appearance from hazards

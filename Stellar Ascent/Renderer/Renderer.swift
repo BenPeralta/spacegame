@@ -11,13 +11,37 @@ struct InstanceData {
     var seed: Float
     var crackColor: SIMD4<Float>     // Path-specific crack glow color
     var crackIntensity: Float        // 0.0–1.0 strength
+    var rotation: Float             // Radians, for surface spin
+    var type: Int32                 // VisualType enum
+    var time: Float                 // For animated textures
 }
 
 struct Uniforms {
-    var cameraPosition: SIMD2<Float>
-    var zoomLevel: Float
+    var projectionMatrix: simd_float4x4
+    var viewMatrix: simd_float4x4
     var time: Float
-    var viewportSize: SIMD2<Float>
+    var screenSize: SIMD2<Float>
+}
+
+private func makeOrtho(left: Float, right: Float, bottom: Float, top: Float, near: Float, far: Float) -> simd_float4x4 {
+    let rml = right - left
+    let tmb = top - bottom
+    let fmn = far - near
+    return simd_float4x4(columns: (
+        SIMD4<Float>(2.0 / rml, 0, 0, 0),
+        SIMD4<Float>(0, 2.0 / tmb, 0, 0),
+        SIMD4<Float>(0, 0, -1.0 / fmn, 0),
+        SIMD4<Float>(-(right + left) / rml, -(top + bottom) / tmb, -near / fmn, 1)
+    ))
+}
+
+private func makeTranslation(_ t: SIMD3<Float>) -> simd_float4x4 {
+    return simd_float4x4(columns: (
+        SIMD4<Float>(1, 0, 0, 0),
+        SIMD4<Float>(0, 1, 0, 0),
+        SIMD4<Float>(0, 0, 1, 0),
+        SIMD4<Float>(t.x, t.y, t.z, 1)
+    ))
 }
 
 class Renderer: NSObject, MTKViewDelegate {
@@ -41,6 +65,8 @@ class Renderer: NSObject, MTKViewDelegate {
     // Camera
     var cameraPos: SIMD2<Float> = .zero
     var zoom: Float = 1.0
+    var simTime: Float = 0.0
+    var flashIntensity: Float = 0.0
     
     init?(metalKitView: MTKView) {
         super.init()
@@ -84,9 +110,11 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     // MARK: - Update Data (Called from Game Loop)
-    func update(instances: [InstanceData], camera: SIMD2<Float>, zoom: Float) {
+    func update(instances: [InstanceData], camera: SIMD2<Float>, zoom: Float, time: Float, flashIntensity: Float) {
         self.cameraPos = camera
         self.zoom = zoom
+        self.simTime = time
+        self.flashIntensity = flashIntensity
         
         // Merge Particles (Draw particles BEHIND entities)
         var allInstances: [InstanceData] = []
@@ -145,14 +173,19 @@ class Renderer: NSObject, MTKViewDelegate {
         encoder?.setRenderPipelineState(pipelineState)
         
         // Set Uniforms
+        let halfW = (viewportSize.x * 0.5) / zoom
+        let halfH = (viewportSize.y * 0.5) / zoom
+        let projection = makeOrtho(left: -halfW, right: halfW, bottom: -halfH, top: halfH, near: -1.0, far: 1.0)
+        let view = makeTranslation(SIMD3<Float>(-cameraPos.x, -cameraPos.y, 0))
         var uniforms = Uniforms(
-            cameraPosition: cameraPos,
-            zoomLevel: zoom,
-            time: Float(Date().timeIntervalSince(startTime)),
-            viewportSize: viewportSize
+            projectionMatrix: projection,
+            viewMatrix: view,
+            time: simTime,
+            screenSize: viewportSize,
+            flashIntensity: flashIntensity
         )
         
-        encoder?.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1) // Index 1 = Uniforms
+        encoder?.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         
         // 1. Draw Background
         // We use a separate pipeline state for background, so we might need separate encoders or switch pipeline.
@@ -208,9 +241,10 @@ class Renderer: NSObject, MTKViewDelegate {
         let entityEncoder = commandBuffer?.makeRenderCommandEncoder(descriptor: descriptor)
         entityEncoder?.setRenderPipelineState(pipelineState)
         entityEncoder?.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
+        entityEncoder?.setFragmentBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)
         
         if let buffer = instanceBuffer {
-            entityEncoder?.setVertexBuffer(buffer, offset: 0, index: 3)
+            entityEncoder?.setVertexBuffer(buffer, offset: 0, index: 0)
             entityEncoder?.drawPrimitives(type: .triangleStrip, vertexStart: 0, vertexCount: 4, instanceCount: instanceCount)
         }
         

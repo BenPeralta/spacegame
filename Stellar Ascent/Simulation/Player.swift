@@ -26,6 +26,10 @@ struct Orbiter {
 struct Player {
     var pos: SIMD2<Float> = .zero
     var vel: SIMD2<Float> = .zero
+    
+    // Rotation physics
+    var rotation: Float = 0.0
+    var spin: Float = 0.0
     var mass: Float = 1.0
     var radius: Float = SimParams.baseRadius
     var health: Float = 100.0

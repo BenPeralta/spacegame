@@ -23,6 +23,12 @@ class World {
     var nextEntityId: Int = 0
     var gameOver: Bool = false
     
+    // Endgame State
+    var isBigBangActive: Bool = false
+    var bigBangTimer: Float = 0.0
+    var flashIntensity: Float = 0.0
+    let blackHoleCriticalMass: Float = 5000.0
+    
     // Callbacks
     var onEvolutionTrigger: (() -> Void)?
     
@@ -42,6 +48,18 @@ class World {
     
     func update(dt: Float, input: SIMD2<Float>) {
         time += dt
+        
+        // Endgame sequence (Implosion -> Flash -> Reset)
+        if player.tier >= 5 && player.mass >= blackHoleCriticalMass {
+            if !isBigBangActive {
+                triggerBigBang()
+            }
+        }
+        
+        if isBigBangActive {
+            updateBigBang(dt: dt)
+            return
+        }
         
         // 1. Grid Rebuild
         spatialGrid.clear()
@@ -91,6 +109,23 @@ class World {
         for i in 0..<entities.count {
             if !entities[i].alive { continue }
             
+            // Apply spin to rotation
+            entities[i].rotation += entities[i].spin * dt
+
+            // AI: Chaser behavior for hazards
+            if entities[i].kind == .hazard {
+                let distToPlayer = distance(entities[i].pos, player.pos)
+                if distToPlayer < 1200.0 {
+                    let dir = normalize(player.pos - entities[i].pos)
+                    let chaseSpeed: Float = 80.0
+                    entities[i].vel += dir * chaseSpeed * dt
+                    
+                    if length(entities[i].vel) > 0.01 {
+                        entities[i].rotation = atan2(entities[i].vel.y, entities[i].vel.x)
+                    }
+                }
+            }
+            
             // Orbital Decay
             let distToPlayer = distance(entities[i].pos, player.pos)
             if distToPlayer < player.radius * 5.0 && entities[i].mass < player.mass * 0.2 {
@@ -133,6 +168,17 @@ class World {
         var instances: [InstanceData] = []
         
         if !gameOver {
+            let playerType: VisualType
+            if player.tier >= 5 {
+                playerType = .blackHole
+            } else if player.tier >= 4 {
+                playerType = .star
+            } else if player.tier >= 3 {
+                playerType = .gas
+            } else {
+                playerType = .rock
+            }
+            
             // Player
             instances.append(InstanceData(
                 position: player.pos,
@@ -142,7 +188,10 @@ class World {
                 glowIntensity: player.evoPath == .none ? 0.0 : (1.0 + Float(player.tier) * 0.2),
                 seed: 0.123,
                 crackColor: player.crackColor,
-                crackIntensity: player.crackIntensity + Float(player.tier) * 0.15
+                crackIntensity: player.crackIntensity + Float(player.tier) * 0.15,
+                rotation: player.rotation,
+                type: Int32(playerType.rawValue),
+                time: time
             ))
             
             // Player Attachments
@@ -155,7 +204,10 @@ class World {
                     glowIntensity: 0.0,
                     seed: att.seed,
                     crackColor: .zero,
-                    crackIntensity: 0.0
+                    crackIntensity: 0.0,
+                    rotation: player.rotation,
+                    type: Int32(att.visualType.rawValue),
+                    time: time
                 ))
             }
         }
@@ -169,11 +221,61 @@ class World {
                 radius: e.radius,
                 color: e.color,
                 glowIntensity: e.kind == .hazard ? 0.8 : 0.3,
-                seed: 0.123,
+                seed: Float(e.id),
                 crackColor: .zero,
-                crackIntensity: 0.0
+                crackIntensity: 0.0,
+                rotation: e.rotation,
+                type: Int32(e.visualType.rawValue),
+                time: time
             ))
         }
         return instances
+    }
+    
+    // MARK: - Big Bang
+    func triggerBigBang() {
+        isBigBangActive = true
+        AudioManager.shared.playEvent("absorb")
+        
+        // Violent pull towards center
+        for i in 0..<entities.count {
+            if entities[i].alive {
+                let dir = normalize(player.pos - entities[i].pos)
+                entities[i].vel = dir * 2000.0
+            }
+        }
+    }
+    
+    func updateBigBang(dt: Float) {
+        bigBangTimer += dt
+        
+        // Flash ramps from 3s to 5s
+        if bigBangTimer > 3.0 {
+            flashIntensity = min(1.0, (bigBangTimer - 3.0) / 2.0)
+        }
+        
+        if bigBangTimer > 6.0 {
+            resetGame()
+        }
+    }
+    
+    func resetGame() {
+        player = Player()
+        player.mass = 5.0
+        player.updateRadius()
+        player.color = SIMD4<Float>(0.55, 0.5, 0.45, 1.0)
+        
+        entities.removeAll(keepingCapacity: true)
+        spatialGrid.clear()
+        
+        isBigBangActive = false
+        bigBangTimer = 0.0
+        flashIntensity = 0.0
+        nextEntityId = 0
+        time = 0.0
+        gameOver = false
+        powerUpMilestonesTriggered.removeAll()
+        
+        spawnInitialMatter()
     }
 }

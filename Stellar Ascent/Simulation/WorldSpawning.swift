@@ -101,7 +101,7 @@ extension World {
             driftVel = normalize(driftDir) * speed
         }
         
-        let e = Entity(
+        var e = Entity(
             id: nextEntityId,
             kind: kind,
             pos: pos,
@@ -110,8 +110,22 @@ extension World {
             radius: radius,
             health: mass * 2.0,
             color: color,
-            alive: true
+            alive: true,
+            rotation: Float.random(in: 0...Float.pi * 2.0),
+            spin: Float.random(in: -1...1),
+            visualType: .rock
         )
+        
+        if e.mass < 50 {
+            e.visualType = .rock
+        } else if e.mass < 300 {
+            e.visualType = .ice
+        } else if e.mass < 1000 {
+            e.visualType = .gas
+        } else {
+            e.visualType = .star
+        }
+        
         entities.append(e)
         nextEntityId += 1
     }

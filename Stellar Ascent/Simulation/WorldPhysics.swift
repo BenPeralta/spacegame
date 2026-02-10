@@ -16,6 +16,10 @@ extension World {
         }
         
         player.pos += player.vel * dt
+        
+        // Apply spin
+        player.rotation += player.spin * dt
+        player.spin *= 0.98
     }
     
     // MARK: Gravity
@@ -60,37 +64,9 @@ extension World {
         let rocheLimit = player.radius * 2.5
         
         if dist < rocheLimit && e.mass < player.mass * 0.1 {
+            shatterEntity(index: targetIndex, impactVel: player.vel * 0.1)
             entities[targetIndex].alive = false
             events.append(.shatter(pos: e.pos, color: e.color))
-            
-            let dustCount = Int.random(in: 2...3)
-            let dustMass = e.mass / Float(dustCount)
-            let entityLimit = 200
-            
-            for _ in 0..<dustCount {
-                if entities.count >= entityLimit { break }
-                let angle = Float.random(in: 0...(2.0 * .pi))
-                let ringRadius = dist + Float.random(in: -5...5)
-                let offset = SIMD2<Float>(cos(angle), sin(angle)) * ringRadius
-                
-                let orbitSpeed = sqrt(SimParams.G * player.mass / ringRadius)
-                let tangent = SIMD2<Float>(-offset.y, offset.x) / ringRadius
-                let ringVel = player.vel + tangent * orbitSpeed
-                
-                let dust = Entity(
-                    id: nextEntityId,
-                    kind: .matter,
-                    pos: player.pos + offset,
-                    vel: ringVel,
-                    mass: dustMass,
-                    radius: SimParams.radiusForMass(dustMass),
-                    health: dustMass,
-                    color: e.color,
-                    alive: true
-                )
-                entities.append(dust)
-                nextEntityId += 1
-            }
         }
     }
     
@@ -104,31 +80,44 @@ extension World {
             let relVel = player.vel - e.vel
             let impactSpeed = length(relVel)
             let massRatio = e.mass / player.mass
+
+            // Black hole behavior: consume without shatter/bounce
+            if player.tier >= 5 {
+                let pullDir = normalize(player.pos - e.pos)
+                entities[targetIndex].vel += pullDir * 1000.0 * 0.016
+                
+                if dist < player.radius * 0.5 {
+                    entities[targetIndex].alive = false
+                    player.mass += e.mass * 0.1
+                    player.updateRadius()
+                    return
+                }
+            }
             
-            // Scale absorb down with mass (harder late-game)
-            let difficulty = min(1.0, player.mass / 800.0)
-            let effectiveAbsorb = SimParams.absorbRatio * (1.0 - difficulty * 0.4)  // 0.50 → 0.30 at high mass
+            // Spin physics (torque)
+            let normal = normalize(player.pos - e.pos)
+            let tangent = SIMD2<Float>(-normal.y, normal.x)
+            let torque = dot(relVel, tangent) * 0.05
+            player.spin += torque / player.mass
             
-            if massRatio <= effectiveAbsorb {
-                // ABSORB
+            // Drifter Star logic: high speed breaks, low speed latches/absorbs
+            let shatterThreshold: Float = 300.0
+            
+            if massRatio <= SimParams.absorbRatio && impactSpeed < shatterThreshold {
+                // Latching (only before compact)
                 if !player.isCompact && player.attachments.count < 30 {
-                    let goldenAngle: Float = 137.5 * .pi / 180.0
-                    let index = Float(player.attachments.count)
-                    let angle = index * goldenAngle
-                    
-                    let radiusVariation = Float.random(in: 0.9...1.1)
-                    let attachDist = player.radius * radiusVariation
-                    let attachPos = SIMD2<Float>(cos(angle), sin(angle)) * attachDist
-                    
+                    let attachPos = e.pos - player.pos
                     let att = Attachment(
                         offset: attachPos,
                         radius: e.radius,
                         color: e.color,
-                        seed: Float(e.id)
+                        seed: Float(e.id),
+                        visualType: e.visualType
                     )
                     player.attachments.append(att)
                 }
                 
+                // Absorb
                 player.mass += e.mass
                 player.updateRadius()
                 player.health = min(player.health + e.mass * 0.1, player.maxHealth)
@@ -136,128 +125,37 @@ extension World {
                 entities[targetIndex].alive = false
                 events.append(.absorb(pos: e.pos, color: e.color))
                 AudioManager.shared.playEvent("absorb")
-                return
-            }
-            
-            // TIDAL DISRUPTION (Spaghettification)
-            // Pre-600: Stretch bounces on mid-sized hazards (teaches speed requirement)
-            // Post-600: Full shred on slow grazes of massive objects
-            if massRatio >= 0.5 && massRatio <= 0.8 && impactSpeed < 300 {
-                if player.mass < 600 {
-                    // Pre-600: Stretch bounce (chip damage + knockback)
-                    let dir = normalize(player.pos - e.pos)
-                    player.vel += dir * -300.0  // Strong bounce
-                    player.health -= 10.0
-                    player.invulnTime = 0.3
-                    
-                    events.append(.damage(pos: player.pos))
-                    AudioManager.shared.playEvent("damage")
-                    return
-                } else if massRatio > 0.6 {
-                    // Post-600: Full shred (50% mass loss + debris)
-                    player.mass *= 0.5
-                    player.updateRadius()
-                    player.health -= 50.0
-                    
-                    // Scatter debris
-                    createPlayerDebris()
-                    createPlayerDebris()
-                    
-                    events.append(.shatter(pos: player.pos, color: player.color))
-                    AudioManager.shared.playEvent("damage")
-                    
-                    if player.health <= 0 {
-                        gameOver = true
-                    }
-                    return
-                }
-            }
-            
-            if massRatio >= SimParams.crushRatio {
-                // CRUSH
-                events.append(.shatter(pos: player.pos, color: player.color))
-                createPlayerDebris()
-                
-                player.health = 0
-                gameOver = true
-                AudioManager.shared.playEvent("damage")
-                
             } else {
-                // IMPACT
+                // Collision / shatter
+                let difficulty = min(1.0, player.mass / 800.0)
+                let dmg = impactSpeed * massRatio * SimParams.damageScale * player.defenseMultiplier * (1.0 + difficulty)
+                
                 if player.invulnTime <= 0 {
-                    let impactForce = impactSpeed * massRatio
-                    // Scale damage with difficulty for late-game challenge
-                    let difficulty = min(1.0, player.mass / 800.0)
-                    let playerDamage = impactForce * SimParams.damageScale * player.defenseMultiplier * (1.0 + difficulty)
-                    player.health -= playerDamage
-                    player.invulnTime = 0.3
-                    
-                    let dir = normalize(player.pos - e.pos)
-                    player.vel += dir * (SimParams.knockbackScale * 600.0 * massRatio)
-                    
+                    player.health -= dmg
+                    player.invulnTime = 0.2
                     events.append(.damage(pos: (player.pos + e.pos) * 0.5))
-                    
-                    if player.health <= 0 {
-                        createPlayerDebris()
-                        gameOver = true
-                        return
-                    }
+                    AudioManager.shared.playEvent("damage")
                 }
                 
-                // SHATTER
-                var remainingMass = e.mass
-                var debrisList: [Float] = []
-                
-                let pieceCount = min(3, max(2, Int(e.mass / 8.0)))
-                
-                for i in 0..<pieceCount {
-                    if i == pieceCount - 1 {
-                        debrisList.append(remainingMass)
-                    } else {
-                        let portion = Float.random(in: 0.2...0.5)
-                        let pieceMass = remainingMass * portion
-                        let clampedMass = max(1.0, min(pieceMass, remainingMass * 0.8))
-                        debrisList.append(clampedMass)
-                        remainingMass -= clampedMass
-                    }
+                if impactSpeed > 150 || massRatio < 0.5 {
+                    shatterEntity(index: targetIndex, impactVel: player.vel * 0.5)
+                    entities[targetIndex].alive = false
+                    events.append(.shatter(pos: e.pos, color: e.color))
+                    player.vel *= 0.9
+                } else {
+                    // Bounce
+                    let impulse = normal * (impactSpeed * 0.8)
+                    player.vel += impulse / player.mass
+                    entities[targetIndex].vel -= impulse / e.mass
+                    
+                    let overlap = combinedRadius - dist
+                    player.pos += normal * (overlap * 0.5)
                 }
                 
-                let impactDir = length(player.vel) > 0.01 ? normalize(player.vel) : SIMD2<Float>(1, 0)
-                let entityLimit = 200
-                
-                for debrisMass in debrisList {
-                    if entities.count >= entityLimit { break }
-                    
-                    let baseAngle = atan2(impactDir.y, impactDir.x)
-                    let spreadAngle = Float.random(in: -Float.pi * 0.7 ... Float.pi * 0.7)
-                    let scatterAngle = baseAngle + spreadAngle
-                    let scatterDir = SIMD2<Float>(cos(scatterAngle), sin(scatterAngle))
-                    
-                    let offset = scatterDir * e.radius * 1.2
-                    
-                    let scatterSpeed = Float.random(in: 80...200)
-                    var debrisVel = scatterDir * scatterSpeed
-                    debrisVel += e.vel * 0.5
-                    debrisVel += player.vel * 0.3
-                    
-                    let debris = Entity(
-                        id: nextEntityId,
-                        kind: .matter,
-                        pos: e.pos + offset,
-                        vel: debrisVel,
-                        mass: debrisMass,
-                        radius: SimParams.radiusForMass(debrisMass, kind: .matter),
-                        health: debrisMass * 1.5,
-                        color: e.color,
-                        alive: true
-                    )
-                    entities.append(debris)
-                    nextEntityId += 1
+                if player.health <= 0 {
+                    createPlayerDebris()
+                    gameOver = true
                 }
-                
-                entities[targetIndex].alive = false
-                events.append(.shatter(pos: e.pos, color: e.color))
-                AudioManager.shared.playEvent("damage")
             }
         }
     }
@@ -274,37 +172,79 @@ extension World {
                 let combinedRadius = entities[i].radius + entities[j].radius
                 
                 if dist < combinedRadius {
-                    let massRatio = entities[j].mass / entities[i].mass
+                    let mi = entities[i].mass
+                    let mj = entities[j].mass
+                    let relVel = entities[i].vel - entities[j].vel
+                    let impactSpeed = length(relVel)
                     
-                    if massRatio < 0.5 {
-                        entities[i].mass += entities[j].mass
-                        entities[j].alive = false
-                    } else if massRatio > 2.0 {
-                        entities[j].mass += entities[i].mass
-                        entities[i].alive = false
+                    // Spin transfer
+                    let normal = normalize(entities[i].pos - entities[j].pos)
+                    let tangent = SIMD2<Float>(-normal.y, normal.x)
+                    let torque = dot(relVel, tangent) * 0.1
+                    
+                    entities[i].spin -= torque / mi
+                    entities[j].spin += torque / mj
+                    
+                    if impactSpeed > 200 {
+                        if mi > mj {
+                            shatterEntity(index: j, impactVel: entities[i].vel * 0.5)
+                            entities[j].alive = false
+                        } else {
+                            shatterEntity(index: i, impactVel: entities[j].vel * 0.5)
+                            entities[i].alive = false
+                        }
+                        events.append(.shatter(pos: (entities[i].pos + entities[j].pos) * 0.5, color: SIMD4(1, 1, 1, 1)))
                     } else {
-                        let normal = normalize(entities[j].pos - entities[i].pos)
-                        let relVel = entities[j].vel - entities[i].vel
+                        let restitution: Float = 0.5
                         let velAlongNormal = dot(relVel, normal)
                         
                         if velAlongNormal < 0 {
-                            let restitution: Float = 0.3
                             let impulse = -(1.0 + restitution) * velAlongNormal
-                            let impulsePerMass = impulse / (1.0/entities[i].mass + 1.0/entities[j].mass)
+                            let impulsePerMass = impulse / (1.0/mi + 1.0/mj)
                             
-                            entities[i].vel -= normal * (impulsePerMass / entities[i].mass)
-                            entities[j].vel += normal * (impulsePerMass / entities[j].mass)
+                            entities[i].vel += normal * (impulsePerMass / mi)
+                            entities[j].vel -= normal * (impulsePerMass / mj)
                         }
                         
                         let overlap = combinedRadius - dist
                         if overlap > 0 {
                             let separation = normal * (overlap * 0.5)
-                            entities[i].pos -= separation
-                            entities[j].pos += separation
+                            entities[i].pos += separation
+                            entities[j].pos -= separation
                         }
                     }
                 }
             }
+        }
+    }
+    
+    // MARK: Shatter Helper
+    func shatterEntity(index: Int, impactVel: SIMD2<Float>) {
+        let e = entities[index]
+        let pieces = Int.random(in: 2...4)
+        let pieceMass = e.mass / Float(pieces)
+        
+        for _ in 0..<pieces {
+            let angle = Float.random(in: 0...Float.pi * 2.0)
+            let dir = SIMD2<Float>(cos(angle), sin(angle))
+            let speed = Float.random(in: 50...200)
+            
+            let debris = Entity(
+                id: nextEntityId,
+                kind: .matter,
+                pos: e.pos + dir * e.radius * 0.5,
+                vel: e.vel + impactVel * 0.3 + dir * speed,
+                mass: pieceMass,
+                radius: SimParams.radiusForMass(pieceMass),
+                health: pieceMass,
+                color: e.color,
+                alive: true,
+                rotation: Float.random(in: 0...Float.pi * 2.0),
+                spin: Float.random(in: -5...5),
+                visualType: e.visualType
+            )
+            entities.append(debris)
+            nextEntityId += 1
         }
     }
     
@@ -327,7 +267,10 @@ extension World {
                 radius: SimParams.radiusForMass(debrisMass, kind: .matter),
                 health: debrisMass,
                 color: player.color,
-                alive: true
+                alive: true,
+                rotation: Float.random(in: 0...Float.pi * 2.0),
+                spin: Float.random(in: -5...5),
+                visualType: .rock
             )
             entities.append(debris)
             nextEntityId += 1

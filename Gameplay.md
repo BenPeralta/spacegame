@@ -1,6 +1,6 @@
 # Stellar Ascent - Complete Gameplay Bible
 
-**Version**: 3.0  
+**Version**: 3.1  
 **Last Updated**: 2026-02-10  
 **Purpose**: Technical specification for third-party developer audits
 
@@ -8,13 +8,11 @@
 
 ## Recent Updates (v3.0)
 
-### Astrophysics Destruction Mechanics
-- **Tidal Disruption (Spaghettification)**:
-  - Pre-600: Stretch bounces (10 damage + knockback) on mid-sized hazards (massRatio 0.5-0.8, speed <300)
-  - Post-600: Full shred (50% mass loss + debris scatter) on slow grazes of massive objects
-- **Giant Impacts (Rogue Asteroids)**:
-  - Pre-600: 5% spawn rogues (mass 15-30, red color) on collision courses
-  - Post-600: 3% spawn massive rogues (mass 400-1500, bright red) = instant death threat
+### Drifter Star Mechanics (Spin + Shatter)
+- **Spin / Rotation**: Collisions now impart torque, making players and entities spin.
+- **Speed-Based Shattering**: Fast impacts break targets into debris; slow impacts allow latching/absorption.
+- **Entity vs Entity**: Planets can destroy each other on high-speed impacts.
+ - **Black Hole**: At Black Hole tier, nearby entities are pulled in and consumed with no shatter.
 
 ### Visual & Progression Fixes
 - **Color Persistence**: Removed `updatePlayerVisualsForTier` color override - chosen path colors now stick
@@ -24,7 +22,7 @@
 - **Power-Up Timing**: Milestone-based triggers (fires exactly at mass 25, 60, 1000 even if mass jumps)
 
 ### Late-Game Difficulty Scaling
-- **Scaled Absorb Ratio**: 0.50 → 0.30 at high mass (harder to absorb late-game)
+- **Absorb Ratio**: Fixed at 0.42 (speed-gated by shatter threshold)
 - **Velocity-Based Damage**: 2x damage at high difficulty
 - **More Giants**: Increased spawn rate of large hazards at high difficulty
 
@@ -77,121 +75,68 @@ let massRatio = entity.mass / player.mass
 let impactSpeed = length(player.vel - entity.vel)
 ```
 
-### Collision Rules (Updated v2.0)
+### Spin / Rotation (Drifter Star)
+- Collisions apply **torque** based on tangential relative velocity.
+- Player and entities accumulate **spin** and **rotation** over time.
+- Angular drag slowly damps spin (`spin *= 0.98` each frame).
 
-| Mass Ratio | Velocity | Behavior | Code Reference |
-|------------|----------|----------|----------------|
-| **< 0.50** | Any | **ABSORB** - Entity merges instantly | World.swift:L375-400 |
-| **0.50 - 0.80** | < 180 | **BUMP** - Damage + bounce, no shatter | World.swift:L427-433 |
-| **0.50 - 0.80** | ≥ 180 | **SHATTER** - Entity breaks into 2 fragments | World.swift:L435-490 |
-| **≥ 0.80** | Any | **CRUSH** - Player dies (game over) | World.swift:L402-410 |
+### Black Hole Consumption
+- At **tier 7 (Black Hole)**, collisions no longer shatter or bounce.
+- Entities are pulled inward and deleted once within the event horizon (`radius * 0.8`).
 
-### Key Changes from v1.0
+### Collision Rules (Drifter Star)
 
-**OLD** (v1.0 - Broken):
-- Absorb < 35% → fragments at 35-50% would re-shatter (chain bug)
-- All 35-80% collisions shattered → dust spam
-- Fragments 3-5 mass → some >35% player → infinite chains
+| Condition | Behavior | Code Reference |
+|-----------|----------|----------------|
+| **massRatio ≤ 0.42 AND impactSpeed < 300** | **ABSORB/LATCH** - entity merges; if not compact, it latches where it hit | WorldPhysics.swift |
+| **impactSpeed > 150 OR massRatio < 0.5** | **SHATTER** - entity breaks into debris | WorldPhysics.swift |
+| **otherwise** | **BOUNCE + DAMAGE** - both bodies recoil; player takes scaled damage | WorldPhysics.swift |
 
-**NEW** (v2.0 - Fixed):
-- Absorb < 50% → fragments always <48% → instant absorb ✅
-- Gentle bumps bounce → only fast impacts shatter
-- Fixed 2 fragments → less entity spam
+### Drifter Star Notes
+- **Speed matters more than mass**: fast hits shatter, slow hits latch/absorb.
+- **Latching**: attachments stick at impact point (not spiral distribution).
 
 ### Absorption Details
 
-**When massRatio < 0.50**:
+**When massRatio ≤ 0.42 AND impactSpeed < 300**:
 1. Entity mass added to player: `player.mass += entity.mass`
 2. Player radius updated: `player.updateRadius()`
-3. Health restored: `player.health += entity.mass * 0.12` (was 0.10)
+3. Health restored: `player.health += entity.mass * 0.10`
 4. Visual attachment created if entity is small enough
 
-**Attachment System** (World.swift:L385-403):
-- Small debris (mass < 15% of player) creates visual "clumps"
-- Max 25 attachments (was 30)
-- Positioned using golden angle spiral: `φ = 137.5°`
-- Attachments removed at Tier 2+ (Hydrostatic Equilibrium)
+**Attachment System** (WorldPhysics.swift):
+- If the player is not compact and impact is slow enough to absorb, the debris **latches at the impact point**.
+- Max 30 attachments.
+- Attachments are removed at Tier 1+ via `compactAttachments()` (clean sphere).
 
 ### Shatter Details
 
-**When 0.50 ≤ massRatio < 0.80 AND impactSpeed ≥ 180**:
-1. Player takes damage: `damage = impactSpeed * massRatio * 0.22 * defenseMultiplier`
-2. Player receives knockback: `knockback = 0.45 * 800.0 * massRatio`
-3. Entity breaks into **exactly 2 fragments**
-4. Fragments scatter with velocity 150-300 units/s (escape velocity)
+**When impactSpeed > 150 OR massRatio < 0.5**:
+1. Player takes damage (if not invulnerable): `damage = impactSpeed * massRatio * damageScale * defenseMultiplier`
+2. Entity breaks into **2–4 fragments** via `shatterEntity`.
+3. Player is slowed slightly (`player.vel *= 0.9`).
 
 ---
 
 ## Fragment Mechanics
 
-### Fragment Creation Formula (v2.0 - FIXED)
+### Fragment Creation (Drifter Star)
 
 ```swift
-// World.swift:L435-465
-let pieceCount = 2  // FIXED: Always 2 pieces
-let safeMax = player.mass * 0.50 * 0.96  // Hard cap at 48% player mass
-
-for i in 0..<1 {  // First piece
-    let portion = Float.random(in: 0.30...0.50)  // 30-50% of parent
-    let pieceMass = remainingMass * portion
-    let maxPiece = min(pieceMass, min(remainingMass * 0.70, safeMax))
-    let clampedMass = max(1.5, maxPiece)  // Min 1.5 for visibility
-    debrisMasses.append(clampedMass)
-    remainingMass -= clampedMass
-}
-debrisMasses.append(remainingMass)  // Second piece gets ALL remaining
+// WorldPhysics.swift: shatterEntity(...)
+let pieces = Int.random(in: 2...4)
+let pieceMass = e.mass / Float(pieces)
+// Each piece gets equal mass, random direction, and spin
 ```
 
 **Key Properties**:
-- **Piece count**: Always 2 (prevents spam)
-- **Mass conservation**: Perfect (last piece = remaining)
-- **Absorb guarantee**: All fragments < 48% player mass
-- **Color**: Exact parent color (no variation)
-- **Seed**: 0.123 (same as all meteors)
-
-### Fragment Collectibility
-
-**Example** (Player mass 20, Asteroid mass 15):
-- massRatio = 15/20 = 0.75 → **SHATTER** (if fast impact)
-- Fragments: 2 pieces of mass ~4.5 and ~10.5
-- But 10.5/20 = 0.525 > 0.50? **NO** - safeMax caps at 9.6 ✅
-- Fragment/Player ratio: 9.6/20 = 0.48 → **Instantly absorbable** ✅
-
-**No more chain shatters!**
+- **Piece count**: 2–4 (dynamic, less predictable).
+- **Mass conservation**: Equal split across pieces.
+- **Spin**: Each fragment spawns with randomized rotation + angular velocity.
 
 ---
 
-## Astrophysics Destruction Mechanics (v3.0)
-
-### Tidal Disruption (Spaghettification)
-
-**Pre-600 Mass** (WorldPhysics.swift:L142-157):
-```swift
-if massRatio >= 0.5 && massRatio <= 0.8 && impactSpeed < 300 && player.mass < 600 {
-    // Stretch bounce (chip damage + knockback)
-    let dir = normalize(player.pos - e.pos)
-    player.vel += dir * -300.0  // Strong bounce
-    player.health -= 10.0
-}
-```
-- **Purpose**: Teaches speed requirement for absorption
-- **Frequency**: Common on mid-sized hazards
-- **Effect**: 10 damage + strong knockback
-
-**Post-600 Mass** (WorldPhysics.swift:L158-173):
-```swift
-if massRatio > 0.6 && impactSpeed < 300 && player.mass >= 600 {
-    // Full shred (50% mass loss + debris)
-    player.mass *= 0.5
-    player.health -= 50.0
-    createPlayerDebris() // 2x debris scatter
-}
-```
-- **Purpose**: Punishes slow approaches to massive objects
-- **Frequency**: Rare but devastating
-- **Effect**: 50% mass loss, 50 damage, possible death
-
-### Giant Impacts (Rogue Asteroids)
+## Spawn Threats (Rogue Asteroids)
 
 **Pre-600 Mass** (WorldSpawning.swift:L44-56):
 ```swift
@@ -215,10 +160,10 @@ if isRogue && player.mass >= 600 {
     driftVel = toPlayer * Float.random(in: 200...400)  // Fast collision course
 }
 ```
-- **Purpose**: Instant death threat
+- **Purpose**: High-speed hazard with lethal impact potential
 - **Spawn Rate**: 3%
 - **Visual**: Bright red for extreme danger
-- **Behavior**: Fast collision course, massRatio >0.7 = instant death
+- **Behavior**: Fast collision course, likely to shatter on impact
 
 ---
 
@@ -227,27 +172,31 @@ if isRogue && player.mass >= 600 {
 ### Tier Thresholds
 
 ```swift
-// World.swift:L565-569
-if mass < 20: tier = 0      // Meteor
-else if mass < 40: tier = 1  // Asteroid
-else if mass < 300: tier = 2 // Planet
-else if mass < 1000: tier = 3 // Gas Giant
-else if mass < 2500: tier = 4 // Star
-else if mass < 5000: tier = 5 // Neutron Star
-else: tier = 6               // Black Hole
+// WorldEvolution.swift
+if mass >= 8000: tier = 8      // Universe
+else if mass >= 5000: tier = 7 // Black Hole
+else if mass >= 2500: tier = 6 // Neutron Star
+else if mass >= 1000: tier = 5 // Star
+else if mass >= 600: tier = 4  // Gas Giant
+else if mass >= 250: tier = 3  // Large Planet
+else if mass >= 60: tier = 2   // Planet
+else if mass >= 25: tier = 1   // Asteroid
+else: tier = 0                 // Meteor
 ```
 
 ### Tier Properties
 
-| Tier | Name | Mass Range | Radius Range | Base Color | Glow |
-|------|------|------------|--------------|------------|------|
-| 0 | Meteor | 1-20 | 9-25 | `(0.55, 0.5, 0.45)` | 0.0 |
-| 1 | Asteroid | 20-40 | 25-38 | `(0.6, 0.6, 0.65)` | 0.0 |
-| 2 | Planet | 40-300 | 38-75 | `(0.3, 0.6, 0.8)` | 1.2 |
-| 3 | Gas Giant | 300-1000 | 75-150 | `(0.9, 0.6, 0.3)` | 1.4 |
-| 4 | Star | 1000-2500 | 150-250 | Evolution-dependent | 1.6 |
-| 5 | Neutron Star | 2500-5000 | 250-350 | Evolution-dependent | 1.8 |
-| 6 | Black Hole | 5000+ | 350+ | Evolution-dependent | 2.0 |
+| Tier | Name | Mass Range | Base Color | Glow |
+|------|------|------------|------------|------|
+| 0 | Meteor | < 25 | `(0.55, 0.5, 0.45)` | 0.0 |
+| 1 | Asteroid | 25–59 | `(0.6, 0.6, 0.65)` | 0.0 |
+| 2 | Planet | 60–249 | `(0.3, 0.6, 0.8)` | 1.2 |
+| 3 | Large Planet | 250–599 | `(0.3, 0.6, 0.8)` | 1.3 |
+| 4 | Gas Giant | 600–999 | `(0.9, 0.6, 0.3)` | 1.4 |
+| 5 | Star | 1000–2499 | Evolution-dependent | 1.6 |
+| 6 | Neutron Star | 2500–4999 | Evolution-dependent | 1.8 |
+| 7 | Black Hole | 5000–7999 | Evolution-dependent | 2.0 |
+| 8 | Universe | 8000+ | Evolution-dependent | 2.2 |
 
 ---
 
@@ -365,6 +314,13 @@ if (radius < 5.0) {
 }
 ```
 
+**Rotation Support**:
+- Shader input now includes `rotation` to spin surface textures visually.
+
+**Procedural Visual Types**:
+- `rock`, `ice`, `lava`, `gas`, `star`, `blackHole`
+- Visual type is assigned at spawn based on mass thresholds.
+
 ---
 
 ## Entity Spawning
@@ -389,6 +345,10 @@ else:               // 2% - Gas Giants
 ```
 
 ---
+
+## Enemy AI (Chasers)
+- Hazards within **1500 units** accelerate toward the player.
+- Hazards rotate to face the player for visual “juice.”
 
 ## Performance Limits
 

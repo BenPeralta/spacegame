@@ -3,50 +3,38 @@
 
 #include <simd/simd.h>
 
-// Buffer index values shared between shader and C code to ensure Metal shader buffer inputs match Metal API buffer set calls.
-typedef enum VertexInputIndex
-{
-    VertexInputIndexVertices     = 0,
-    VertexInputIndexUniforms     = 1,
-    VertexInputIndexViewport     = 2,
-    VertexInputIndexInstances    = 3
-} VertexInputIndex;
+// Visual Types for the Shader
+enum EntityVisualType {
+    VisualTypeRock = 0,
+    VisualTypeIce = 1,
+    VisualTypeLava = 2,
+    VisualTypeGas = 3,
+    VisualTypeStar = 4,
+    VisualTypeBlackHole = 5
+};
 
-// Attribute index values shared between shader and C code to ensure Metal shader vertex attribute indices match the Metal API vertex descriptor.
-typedef enum VertexAttribute
-{
-    VertexAttributePosition  = 0,
-    VertexAttributeColor     = 1,
-} VertexAttribute;
-
-// Common vertex structure
-typedef struct
-{
-    vector_float2 position;
-    vector_float4 color;
-    float size; // Point size for point primitives or radius for circle SDF
-} Vertex;
-
-// Per-instance data for our entities (rocks, player, etc)
-typedef struct
-{
+struct InstanceData {
     vector_float2 position;
     vector_float2 velocity;
     float radius;
     vector_float4 color;
     float glowIntensity;
-    float seed;
-    vector_float4 crackColor;      // Path-specific crack glow color
-    float crackIntensity;          // 0.0–1.0 strength (increases with tier)
-} InstanceData;
+    float seed;            // Random seed for procedural generation
+    vector_float4 crackColor;
+    float crackIntensity;
+    
+    // NEW: Drifter Star Visuals
+    float rotation;        // Current rotation angle in radians
+    int type;             // VisualType enum
+    float time;           // For animated textures (clouds/lava)
+};
 
-// Global uniforms
-typedef struct
-{
-    vector_float2 cameraPosition;
-    float zoomLevel;
+struct Uniforms {
+    matrix_float4x4 projectionMatrix;
+    matrix_float4x4 viewMatrix;
     float time;
-    vector_float2 viewportSize;
-} Uniforms;
+    vector_float2 screenSize;
+    float flashIntensity;
+};
 
 #endif /* ShaderTypes_h */
