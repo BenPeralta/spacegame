@@ -97,13 +97,26 @@ extension World {
                 }
             }
             
+            // Absolute Zero (Blue) active: unstoppable
+            let isBlueActive = player.evoPath == .frozenFortress && player.abilityActiveTime > 0
+            if isBlueActive {
+                let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.8)
+                if entities.count + debris.count < 300 {
+                    entities.append(contentsOf: debris)
+                    nextEntityId += debris.count
+                }
+                entities[targetIndex].alive = false
+                events.append(.shatter(pos: e.pos, color: e.color))
+                return
+            }
+            
             // Spin physics (Unchanged)
             let normal = normalize(player.pos - e.pos)
             let tangent = SIMD2<Float>(-normal.y, normal.x)
             let torque = dot(relVel, tangent) * 0.05
             player.spin += torque / player.mass
             
-            let shatterThreshold: Float = 250.0
+            let shatterThreshold: Float = 550.0
             
             if massRatio <= SimParams.absorbRatio && impactSpeed < shatterThreshold {
                 if !player.isCompact && player.attachments.count < 30 {

@@ -218,30 +218,95 @@ extension World {
     }
     
     // MARK: Abilities
-    func useAbility() {
-        if player.evoPath == .warPlanet && player.abilityCooldown <= 0 {
-            player.abilityCooldown = player.maxAbilityCooldown
-            
-            events.append(.absorb(pos: player.pos, color: SIMD4<Float>(1, 0, 0, 1)))
-            events.append(.shatter(pos: player.pos, color: player.color))
-            
-            let shockwaveRange: Float = 800.0
-            for i in 0..<entities.count {
-                if !entities[i].alive { continue }
-                let dist = distance(entities[i].pos, player.pos)
-                if dist < shockwaveRange {
-                    let dir = normalize(entities[i].pos - player.pos)
-                    let force = (1.0 - dist / shockwaveRange) * 2000.0
-                    entities[i].vel += dir * force
-                    
-                    entities[i].health -= player.damageMultiplier * 50.0
-                    if entities[i].health <= 0 {
-                        entities[i].alive = false
-                        events.append(.shatter(pos: entities[i].pos, color: entities[i].color))
+    func activateAbility() {
+        if player.abilityCooldown > 0 { return }
+        
+        player.abilityCooldown = player.maxAbilityCooldown
+        player.abilityActiveTime = 5.0
+        
+        switch player.evoPath {
+        case .warPlanet:
+            triggerSupernova()
+        case .cradleOfLife:
+            triggerGravityWell()
+        case .frozenFortress:
+            triggerAbsoluteZero()
+        default:
+            break
+        }
+    }
+    
+    func updateAbilities(dt: Float) {
+        if player.abilityCooldown > 0 {
+            player.abilityCooldown = max(0.0, player.abilityCooldown - dt)
+        }
+        
+        if player.abilityActiveTime > 0 {
+            player.abilityActiveTime = max(0.0, player.abilityActiveTime - dt)
+        }
+        
+        if player.invulnTime > 0 {
+            player.invulnTime = max(0.0, player.invulnTime - dt)
+        }
+        
+        if player.evoPath == .cradleOfLife && player.abilityActiveTime > 0 {
+            applyGravityWell(dt: dt)
+        }
+    }
+    
+    func triggerSupernova() {
+        let range: Float = 600.0
+        var newDebris: [Entity] = []
+        
+        for i in 0..<entities.count {
+            if !entities[i].alive { continue }
+            let dist = distance(player.pos, entities[i].pos)
+            if dist < range {
+                if entities[i].mass < player.mass * 1.5 {
+                    let debris = generateDebris(from: entities[i], impactVel: .zero)
+                    for var d in debris {
+                        let dir = normalize(d.pos - player.pos)
+                        d.vel = dir * 20.0
+                        newDebris.append(d)
                     }
+                    entities[i].alive = false
+                    events.append(.shatter(pos: entities[i].pos, color: entities[i].color))
+                } else {
+                    let dir = normalize(entities[i].pos - player.pos)
+                    entities[i].vel += dir * 500.0
                 }
             }
-            AudioManager.shared.playEvent("damage")
         }
+        
+        if !newDebris.isEmpty && entities.count + newDebris.count < 300 {
+            entities.append(contentsOf: newDebris)
+            nextEntityId += newDebris.count
+        }
+        
+        AudioManager.shared.playEvent("damage")
+    }
+    
+    func triggerGravityWell() {
+        // Visual cue placeholder
+    }
+    
+    func applyGravityWell(dt: Float) {
+        let range: Float = 1200.0
+        for i in 0..<entities.count {
+            if !entities[i].alive { continue }
+            let dist = distance(player.pos, entities[i].pos)
+            if dist < range && dist > player.radius {
+                let dir = normalize(player.pos - entities[i].pos)
+                entities[i].vel += dir * 800.0 * dt
+            }
+        }
+    }
+    
+    func triggerAbsoluteZero() {
+        player.invulnTime = max(player.invulnTime, 5.0)
+    }
+    
+    func useAbility() {
+        activateAbility()
     }
 }

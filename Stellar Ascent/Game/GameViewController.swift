@@ -7,6 +7,7 @@ enum GameState {
     case menu
     case playing
     case paused
+    case levelingUp
     case gameOver
 }
 
@@ -24,6 +25,7 @@ class GameCoordinator: ObservableObject {
     @Published var showEvolutionSelection: Bool = false
     @Published var selectedPath: EvoPath = .none
     @Published var abilityCooldown: Float = 0.0
+    @Published var maxAbilityCooldown: Float = 5.0
     
     var inputVector: SIMD2<Float> = .zero
     var capturePressed: Bool = false  // Manual orbit capture
@@ -88,7 +90,7 @@ class GameViewController: UIViewController {
         
         // Input Handling
         coordinator.onAbilityPress = { [weak self] in
-            self?.world.useAbility()
+            self?.world.activateAbility()
         }
         
         coordinator.onPathSelect = { [weak self] path in
@@ -109,7 +111,7 @@ class GameViewController: UIViewController {
         world.onEvolutionTrigger = { [weak self] in
             DispatchQueue.main.async {
                 self?.coordinator?.showEvolutionSelection = true
-                self?.coordinator?.gameState = .paused // Pause game logic for selection
+                self?.coordinator?.gameState = .levelingUp
             }
         }
     }
@@ -136,7 +138,7 @@ class GameViewController: UIViewController {
             // Still render though? Maybe strict pause freezes rendering too?
             // If we want to see the frozen frame, we should render but not update.
             // For now, let's render static frame if paused
-            if coordinator?.gameState == .paused || coordinator?.gameState == .gameOver {
+            if coordinator?.gameState == .paused || coordinator?.gameState == .levelingUp || coordinator?.gameState == .gameOver {
                  // Render last frame without update
                  let instances = world.getRenderInstances()
                  let camera = world.player.pos
@@ -157,6 +159,7 @@ class GameViewController: UIViewController {
         // Physics Step (Simple Fixed DT approximation for MVP: just use dt with max clamp)
         let clampedDT = min(dt, 0.05) // Prevent spiral of death
         world.update(dt: clampedDT, input: input)
+        world.updateAbilities(dt: clampedDT)
         
         // Process Events
         for event in world.events {
@@ -197,11 +200,16 @@ class GameViewController: UIViewController {
         // Update Coordinator State
         if world.player.abilityCooldown > 0 {
             let cooldown = world.player.abilityCooldown
+            let maxCooldown = world.player.maxAbilityCooldown
             DispatchQueue.main.async {
                 self.coordinator?.abilityCooldown = cooldown
+                self.coordinator?.maxAbilityCooldown = maxCooldown
             }
         } else if (coordinator.abilityCooldown) > 0 {
-             DispatchQueue.main.async { self.coordinator?.abilityCooldown = 0 }
+             DispatchQueue.main.async {
+                 self.coordinator?.abilityCooldown = 0
+                 self.coordinator?.maxAbilityCooldown = self.world.player.maxAbilityCooldown
+             }
         }
         
         // Update Renderer

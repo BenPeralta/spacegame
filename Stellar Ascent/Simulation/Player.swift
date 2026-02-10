@@ -62,6 +62,7 @@ struct Player {
     // Ability
     var abilityCooldown: Float = 0.0
     var maxAbilityCooldown: Float = 5.0 // Default 5s
+    var abilityActiveTime: Float = 0.0  // Active window for abilities
     
     // Accretion (Visual Clumping)
     var attachments: [Attachment] = []

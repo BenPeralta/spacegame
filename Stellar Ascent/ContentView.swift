@@ -13,12 +13,12 @@ struct ContentView: View {
                     .edgesIgnoringSafeArea(.all)
                 
                 // HUD Layer (Only visible when playing or paused)
-                if coordinator.gameState == .playing || coordinator.gameState == .paused {
+                if coordinator.gameState == .playing || coordinator.gameState == .paused || coordinator.gameState == .levelingUp {
                     hudLayer
                 }
                 
                 // Overlays
-                if coordinator.showEvolutionSelection {
+                if coordinator.gameState == .levelingUp && coordinator.showEvolutionSelection {
                     EvolutionSelectionView { path in
                         coordinator.onPathSelect?(path)
                         withAnimation {
@@ -61,7 +61,9 @@ struct ContentView: View {
                 
                 Button(action: {
                     withAnimation {
-                        coordinator.gameState = .paused
+                        if coordinator.gameState == .playing {
+                            coordinator.gameState = .paused
+                        }
                     }
                 }) {
                     Image(systemName: "pause.circle.fill")
@@ -78,29 +80,25 @@ struct ContentView: View {
                     .padding(50)
                 Spacer()
                 
-                // Ability Button
                 if coordinator.selectedPath == .warPlanet {
-                    Button(action: {
-                        coordinator.onAbilityPress?()
-                    }) {
-                        ZStack {
-                            Circle()
-                                .fill(Color.red.opacity(0.8))
-                                .frame(width: 80, height: 80)
-                                .shadow(color: .red, radius: 10)
-                            
-                            Image(systemName: "flame.fill")
-                                .font(.title)
-                                .foregroundColor(.white)
-                            
-                            // Cooldown overlay
-                            if coordinator.abilityCooldown > 0 {
-                                Circle()
-                                    .trim(from: 0, to: CGFloat(coordinator.abilityCooldown / 5.0))
-                                    .stroke(Color.black.opacity(0.5), lineWidth: 80)
-                                    .rotationEffect(.degrees(-90))
-                            }
-                        }
+                    Button(action: { coordinator.onAbilityPress?() }) {
+                        AbilityButtonView(color: .red, icon: "flame.fill", cooldown: coordinator.abilityCooldown, maxCooldown: coordinator.maxAbilityCooldown)
+                    }
+                    .padding(50)
+                    .disabled(coordinator.abilityCooldown > 0)
+                }
+                
+                if coordinator.selectedPath == .cradleOfLife {
+                    Button(action: { coordinator.onAbilityPress?() }) {
+                        AbilityButtonView(color: .green, icon: "tornado", cooldown: coordinator.abilityCooldown, maxCooldown: coordinator.maxAbilityCooldown)
+                    }
+                    .padding(50)
+                    .disabled(coordinator.abilityCooldown > 0)
+                }
+                
+                if coordinator.selectedPath == .frozenFortress {
+                    Button(action: { coordinator.onAbilityPress?() }) {
+                        AbilityButtonView(color: .cyan, icon: "snowflake", cooldown: coordinator.abilityCooldown, maxCooldown: coordinator.maxAbilityCooldown)
                     }
                     .padding(50)
                     .disabled(coordinator.abilityCooldown > 0)
@@ -215,10 +213,38 @@ struct ContentView: View {
         coordinator.health = 100
         coordinator.tier = "Meteor"
         coordinator.selectedPath = .none
-        coordinator.showEvolutionSelection = false
-        coordinator.abilityCooldown = 0.0
+                        coordinator.showEvolutionSelection = false
+                        coordinator.abilityCooldown = 0.0
+                        coordinator.maxAbilityCooldown = 5.0
         
         // Trigger world reset via notification
         NotificationCenter.default.post(name: NSNotification.Name("RestartGame"), object: nil)
+    }
+}
+
+struct AbilityButtonView: View {
+    var color: Color
+    var icon: String
+    var cooldown: Float
+    var maxCooldown: Float
+    
+    var body: some View {
+        ZStack {
+            Circle()
+                .fill(color.opacity(0.8))
+                .frame(width: 80, height: 80)
+                .shadow(color: color, radius: 10)
+            
+            Image(systemName: icon)
+                .font(.title)
+                .foregroundColor(.white)
+            
+            if cooldown > 0 {
+                Circle()
+                    .trim(from: 0, to: CGFloat(cooldown / max(0.01, maxCooldown)))
+                    .stroke(Color.black.opacity(0.5), lineWidth: 80)
+                    .rotationEffect(.degrees(-90))
+            }
+        }
     }
 }
