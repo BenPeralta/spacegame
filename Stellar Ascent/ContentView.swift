@@ -54,6 +54,8 @@ struct ContentView: View {
                         .font(.custom("Avenir Next", size: 24))
                         .fontWeight(.bold)
                         .foregroundColor(.white)
+                    EvolutionProgressBar(currentMass: Float(coordinator.score))
+                        .frame(width: 180, height: 22)
                 }
                 .padding()
                 
@@ -247,5 +249,70 @@ struct AbilityButtonView: View {
                     .rotationEffect(.degrees(-90))
             }
         }
+    }
+}
+
+struct EvolutionProgressBar: View {
+    let currentMass: Float
+    
+    var stageInfo: (current: Progression.Stage, next: Progression.Stage?, progress: Float) {
+        let current = Progression.getStage(mass: currentMass)
+        let next = Progression.getNextStage(mass: currentMass)
+        
+        guard let nextStage = next else {
+            let finalProgress = (currentMass - 50000.0) / (Progression.winMass - 50000.0)
+            return (current, nil, min(1.0, max(0.0, finalProgress)))
+        }
+        
+        let range = nextStage.threshold - current.threshold
+        let completed = currentMass - current.threshold
+        let percent = completed / max(1.0, range)
+        
+        return (current, nextStage, min(1.0, max(0.0, percent)))
+    }
+    
+    var body: some View {
+        let info = stageInfo
+        
+        VStack(alignment: .leading, spacing: 3) {
+            GeometryReader { geo in
+                ZStack(alignment: .leading) {
+                    Capsule().fill(Color.white.opacity(0.15))
+                    Capsule()
+                        .fill(LinearGradient(
+                            gradient: Gradient(colors: getColors(for: info.current.name)),
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        ))
+                        .frame(width: geo.size.width * CGFloat(info.progress))
+                        .animation(.linear(duration: 0.2), value: info.progress)
+                    Capsule().stroke(Color.white.opacity(0.1), lineWidth: 1)
+                }
+            }
+            .frame(height: 8)
+            
+            HStack {
+                Text(info.current.name)
+                    .font(.system(size: 10, weight: .bold))
+                    .foregroundColor(.white.opacity(0.8))
+                Spacer()
+                if let next = info.next {
+                    Text("Next: \(next.name)")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(.white.opacity(0.5))
+                } else {
+                    Text("CRITICAL MASS IMMINENT")
+                        .font(.system(size: 10, weight: .black))
+                        .foregroundColor(.red)
+                }
+            }
+        }
+    }
+    
+    func getColors(for name: String) -> [Color] {
+        if name.contains("Star") { return [.orange, .red] }
+        if name.contains("Neutron") { return [.cyan, .white] }
+        if name.contains("Black") { return [.purple, .black] }
+        return [.blue, .green]
     }
 }

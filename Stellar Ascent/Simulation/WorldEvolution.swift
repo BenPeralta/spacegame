@@ -7,48 +7,26 @@ extension World {
     // MARK: Tier Progression
     func checkTier() {
         let mass = player.mass
-        let oldTier = player.tier
-        var newTier = 0
+        let stage = Progression.getStage(mass: mass)
+        let stageIndex = Progression.getStageIndex(mass: mass)
         
-        if mass >= 8000 { newTier = 8 }      // Universe
-        else if mass >= 5000 { newTier = 7 } // Black Hole
-        else if mass >= 2500 { newTier = 6 }
-        else if mass >= 1000 { newTier = 5 } // Star
-        else if mass >= 600 { newTier = 4 }  // Gas Giant
-        else if mass >= 250 { newTier = 3 }  // Large Planet
-        else if mass >= 60 { newTier = 2 }   // Planet
-        else if mass >= 25 { newTier = 1 }   // Asteroid
-        else { newTier = 0 }                 // Meteor
-        
-        if newTier != oldTier {
-            player.tier = newTier
-            events.append(.evolve(tier: newTier))
+        if stageIndex != player.tier {
+            player.tier = stageIndex
+            events.append(.evolve(tier: stageIndex))
             
-            // Compact at Asteroid+ (tier 1+) for clean sphere
-            if newTier >= 1 && !player.isCompact {
+            if stageIndex >= 1 && !player.isCompact {
                 compactAttachments()
             }
-            
-            updatePlayerVisualsForTier(newTier)
-            
-            // === POWER-UP TRIGGERS (milestone-based, fires exactly once) ===
-            let milestones: [Float] = [25, 60, 1000, 8000]
-            for milestone in milestones {
-                if mass >= milestone && !powerUpMilestonesTriggered.contains(milestone) {
-                    if milestone < 8000 {
-                        onEvolutionTrigger?()
-                    } else {
-                        triggerPathEnding()
-                    }
-                    powerUpMilestonesTriggered.insert(milestone)
-                    break  // One at a time
-                }
-            }
-            
-            // Supernova chance increases with tier
-            if newTier >= 5 && Float.random(in: 0...1) < Float(newTier - 4) * 0.25 {
-                supernova()
-            }
+        }
+        
+        if stage.threshold > lastTriggeredThreshold && stage.threshold > 0 {
+            lastTriggeredThreshold = stage.threshold
+            onEvolutionTrigger?()
+            updatePlayerVisuals(stage: stage)
+        }
+        
+        if mass >= Progression.winMass && !isBigBangActive {
+            triggerBigBang()
         }
     }
     
@@ -100,7 +78,7 @@ extension World {
             player.color = newColor  // First choice - pure color
         }
         
-        player.crackIntensity = 0.7 + Float(player.tier) * 0.1
+        player.crackIntensity = 0.7 + Float(player.stageIndex) * 0.1
         player.updateRadius()
     }
     
@@ -213,8 +191,27 @@ extension World {
         events.append(.absorb(pos: player.pos, color: player.color))  // Inward suck effect
     }
     
-    func updatePlayerVisualsForTier(_ tier: Int) {
-        // Removed - color now handled only in selectPath for persistence
+    func updatePlayerVisuals(stage: Progression.Stage) {
+        switch stage.name {
+        case "Dwarf Planet":
+            player.color = SIMD4<Float>(0.6, 0.8, 1.0, 1.0)
+        case "Rocky Planet":
+            player.color = SIMD4<Float>(0.8, 0.4, 0.2, 1.0)
+        case "Gas Giant":
+            player.color = SIMD4<Float>(0.9, 0.7, 0.5, 1.0)
+        case "Dwarf Star":
+            player.color = SIMD4<Float>(1.0, 0.2, 0.1, 1.0)
+        case "Star":
+            player.color = SIMD4<Float>(1.0, 0.9, 0.4, 1.0)
+        case "Giant Star":
+            player.color = SIMD4<Float>(0.2, 0.6, 1.0, 1.0)
+        case "Super Giant":
+            player.color = SIMD4<Float>(1.0, 1.0, 0.9, 1.0)
+        case "Neutron Star":
+            player.color = SIMD4<Float>(1.0, 1.0, 1.0, 1.0)
+        default:
+            break
+        }
     }
     
     // MARK: Abilities

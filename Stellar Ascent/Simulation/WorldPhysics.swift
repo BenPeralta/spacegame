@@ -130,7 +130,7 @@ extension World {
             let massRatio = e.mass / player.mass
             
             // Black hole behavior (Unchanged)
-            if player.tier >= 5 {
+            if player.currentStage.visualType == .blackHole {
                 let pullDir = normalize(player.pos - e.pos)
                 entities[targetIndex].vel += pullDir * 1000.0 * 0.016
                 if dist < player.radius * 0.5 {

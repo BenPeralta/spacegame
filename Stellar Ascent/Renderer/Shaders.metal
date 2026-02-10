@@ -115,19 +115,25 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uni
         finalColor += in.color.rgb * noiseVal * 0.5;
         alpha = (1.0 - smoothstep(0.0, 1.0, dist)) * in.color.a;
         light = 1.0;
-    } else if (in.type == 5) { // BLACK HOLE (Polished)
-        float pulse = sin(in.time * 2.0) * 0.05;
-        float horizonRadius = 0.45 + pulse;
+    } else if (in.type == 5) { // BLACK HOLE (1:17 Style)
+        float pulse = sin(uniforms.time * 3.0) * 0.02;
+        float horizonRadius = 0.40 + pulse;
+        float horizon = 1.0 - smoothstep(horizonRadius - 0.01, horizonRadius + 0.01, dist);
+        
+        float photonRing = smoothstep(horizonRadius, horizonRadius + 0.02, dist) * (1.0 - smoothstep(horizonRadius + 0.05, horizonRadius + 0.08, dist));
+        
         float angle = atan2(in.uv.y, in.uv.x);
-        float spiral = angle * 2.0 + in.time * 3.0;
-        float diskNoise = fbm(float2(dist * 10.0 - in.time, spiral));
-        float ring = smoothstep(0.5, 0.8, dist) * (1.0 - smoothstep(0.9, 1.0, dist));
-        ring *= (0.8 + 0.5 * diskNoise);
-        float horizon = 1.0 - smoothstep(horizonRadius - 0.05, horizonRadius, dist);
-        float3 diskColor = float3(0.6, 0.1, 0.8);
-        if (in.glow > 1.5) diskColor += float3(0.5, 0.8, 1.0);
-        finalColor = mix(diskColor * 4.0, float3(0.0), horizon);
-        alpha = ring + horizon;
+        float spiral = angle * 3.0 + uniforms.time * 4.0;
+        float diskNoise = fbm(float2(dist * 12.0 - uniforms.time * 2.0, spiral));
+        float diskShape = smoothstep(0.45, 0.6, dist) * (1.0 - smoothstep(0.9, 1.0, dist));
+        float doppler = smoothstep(-1.0, 1.0, -in.uv.x);
+        float3 diskColor = mix(float3(0.4, 0.0, 0.8), float3(0.2, 0.6, 1.0), diskNoise * doppler);
+        if (in.glow > 1.5) diskColor += float3(0.8, 0.4, 0.2) * (1.0 - dist);
+        
+        finalColor = diskColor * diskShape * (0.5 + 1.5 * diskNoise);
+        finalColor += float3(1.0) * photonRing * 3.0;
+        finalColor = mix(finalColor, float3(0.0), horizon);
+        alpha = clamp(diskShape + horizon + photonRing, 0.0, 1.0);
         light = 1.0;
     } else if (in.type == 7) { // RELATIVISTIC JET
         float core = 1.0 - smoothstep(0.0, 0.3, fabs(in.uv.y));
@@ -136,10 +142,31 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uni
         finalColor += float3(0.8, 1.0, 1.0) * noiseVal * core;
         alpha = core * in.color.a;
         light = 1.0;
+    } else if (in.type == 8) { // NEUTRON STAR (PULSAR)
+        float core = 1.0 - smoothstep(0.0, 0.6, dist);
+        finalColor = float3(0.8, 0.9, 1.0) * (1.0 + core * 2.0);
+        
+        float spinSpeed = in.time * 20.0;
+        float2 spinUV = float2(
+            in.uv.x * cos(spinSpeed) - in.uv.y * sin(spinSpeed),
+            in.uv.x * sin(spinSpeed) + in.uv.y * cos(spinSpeed)
+        );
+        float field = fbm(spinUV * 5.0);
+        finalColor += float3(0.0, 0.5, 1.0) * field * 0.5;
+        
+        float angle = atan2(in.uv.y, in.uv.x);
+        float beam = sin(angle * 2.0 + spinSpeed);
+        beam = smoothstep(0.9, 1.0, beam);
+        float beamMask = smoothstep(0.3, 0.8, dist);
+        finalColor += float3(0.5, 1.0, 1.0) * beam * beamMask * 2.0;
+        
+        light = 1.0;
     } else if (in.type == 4) { // STAR
-        float n = fbm(rotatedUV * 3.0 + float2(in.time * 0.5, 0.0));
+        float n = fbm(rotatedUV * 3.0 + float2(in.time * 0.2, 0.0));
         float flares = smoothstep(0.6, 1.0, n);
-        finalColor += float3(1.0, 0.9, 0.5) * flares;
+        float3 base = in.color.rgb;
+        float3 hot = mix(base, float3(1.0, 1.0, 1.0), 0.5);
+        finalColor = base + hot * flares;
         light = 1.2;
     } else if (in.type == 3) { // GAS GIANT (Animated Bands)
         float shift = in.time * 0.2;

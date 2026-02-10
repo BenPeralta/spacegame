@@ -27,13 +27,13 @@ class World {
     var isBigBangActive: Bool = false
     var bigBangTimer: Float = 0.0
     var flashIntensity: Float = 0.0
-    let blackHoleCriticalMass: Float = 5000.0
+    let blackHoleCriticalMass: Float = Progression.winMass
     
     // Callbacks
     var onEvolutionTrigger: (() -> Void)?
     
-    // Power-up milestone tracking (ensures exact triggers even if mass jumps)
-    var powerUpMilestonesTriggered: Set<Float> = []
+    // Progression tracking
+    var lastTriggeredThreshold: Float = 0.0
     
     init() {
         self.player = Player()
@@ -50,7 +50,7 @@ class World {
         time += dt
         
         // Endgame sequence (Implosion -> Flash -> Reset)
-        if player.tier >= 5 && player.mass >= blackHoleCriticalMass {
+        if player.currentStage.visualType == .blackHole && player.mass >= blackHoleCriticalMass {
             if !isBigBangActive {
                 triggerBigBang()
             }
@@ -184,27 +184,26 @@ class World {
         var instances: [InstanceData] = []
         
         if !gameOver {
-            let playerType: VisualType
-            if player.tier >= 5 {
-                playerType = .blackHole
-            } else if player.tier >= 4 {
-                playerType = .star
-            } else if player.tier >= 3 {
-                playerType = .gas
-            } else {
-                playerType = .rock
-            }
+            let playerType = player.currentStage.visualType
+            let stageIndex = player.stageIndex
             
             // Player
+            var glow = player.evoPath == .none ? 0.0 : (1.0 + Float(stageIndex) * 0.2)
+            if player.hawkingDamage > 0 {
+                glow += 0.5 + sin(time * 10.0) * 0.2
+            }
+            if player.mass >= 12000 && player.mass < 25000 {
+                glow += sin(time * 5.0) * 0.3
+            }
             instances.append(InstanceData(
                 position: player.pos,
                 velocity: player.vel,
                 radius: player.radius,
                 color: player.color,
-                glowIntensity: player.evoPath == .none ? 0.0 : (1.0 + Float(player.tier) * 0.2) + (player.hawkingDamage > 0 ? (0.5 + sin(time * 10.0) * 0.2) : 0.0),
+                glowIntensity: glow,
                 seed: 0.123,
                 crackColor: player.crackColor,
-                crackIntensity: player.crackIntensity + Float(player.tier) * 0.15,
+                crackIntensity: player.crackIntensity + Float(stageIndex) * 0.15,
                 rotation: player.rotation,
                 type: Int32(playerType.rawValue),
                 time: time
@@ -306,7 +305,7 @@ class World {
         nextEntityId = 0
         time = 0.0
         gameOver = false
-        powerUpMilestonesTriggered.removeAll()
+        lastTriggeredThreshold = 0.0
         
         spawnInitialMatter()
     }

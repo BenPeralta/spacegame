@@ -17,6 +17,7 @@ enum VisualType: Int {
     case blackHole = 5
     case trail = 6
     case jet = 7
+    case neutron = 8
 }
 
 struct Entity {

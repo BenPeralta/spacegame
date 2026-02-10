@@ -115,7 +115,7 @@ class GameViewController: UIViewController {
         
         // World Callbacks
         world.onEvolutionTrigger = { [weak self] in
-            let tier = self?.world.player.tier ?? 0
+            let tier = self?.world.player.stageIndex ?? 0
             let options = UpgradePool.shared.getOptions(for: tier)
             DispatchQueue.main.async {
                 self?.coordinator?.showEvolutionSelection = true
@@ -153,13 +153,13 @@ class GameViewController: UIViewController {
                  let camera = world.player.pos
                  let baseScale: Float = 100.0
                  var radiusPadding: Float = 60.0
-                 if world.player.tier >= 5 {
+                 if world.player.currentStage.visualType == .blackHole {
                      radiusPadding = 400.0
                  }
                  let targetZoom = baseScale / (world.player.radius + radiusPadding)
                  let zoom: Float = max(0.15, min(2.0, targetZoom))
                  let flags = buildVisualFlags()
-                 let playerType: Int32 = world.player.tier >= 5 ? 5 : (world.player.tier >= 4 ? 4 : (world.player.tier >= 3 ? 3 : 0))
+                 let playerType: Int32 = Int32(world.player.currentStage.visualType.rawValue)
                  renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos, playerRadius: world.player.radius, playerType: playerType, activeUpgrades: flags)
             }
             return
@@ -238,9 +238,7 @@ class GameViewController: UIViewController {
             self.coordinator?.score = Int(self.world.player.mass)
             self.coordinator?.health = self.world.player.health
             
-            let tiers = ["Meteor", "Asteroid", "Planet", "Gas Giant", "Star", "Neutron Star", "Black Hole"]
-            let tIndex = max(0, min(tiers.count-1, self.world.player.tier))
-            self.coordinator?.tier = tiers[tIndex]
+            self.coordinator?.tier = self.world.player.currentStage.name
             
             if self.world.gameOver {
                 self.coordinator?.gameState = .gameOver
@@ -253,14 +251,14 @@ class GameViewController: UIViewController {
         // Base Scale: 80.0 / (Radius + 40.0) -> Start ~ 1.33, End ~ 0.1
         let baseScale: Float = 100.0
         var radiusPadding: Float = 60.0
-        if world.player.tier >= 5 {
+        if world.player.currentStage.visualType == .blackHole {
             radiusPadding = 400.0
         }
         let targetZoom = baseScale / (world.player.radius + radiusPadding)
         let zoom: Float = max(0.15, min(2.0, targetZoom))
         
         let flags = buildVisualFlags()
-        let playerType: Int32 = world.player.tier >= 5 ? 5 : (world.player.tier >= 4 ? 4 : (world.player.tier >= 3 ? 3 : 0))
+        let playerType: Int32 = Int32(world.player.currentStage.visualType.rawValue)
         renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos, playerRadius: world.player.radius, playerType: playerType, activeUpgrades: flags)
     }
     

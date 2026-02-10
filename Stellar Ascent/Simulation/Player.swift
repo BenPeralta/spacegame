@@ -1,6 +1,45 @@
 import Foundation
 import simd
 
+// MARK: - Progression Constants
+struct Progression {
+    struct Stage {
+        let name: String
+        let threshold: Float
+        let visualType: VisualType
+        let scale: Float
+    }
+    
+    static let stages: [Stage] = [
+        Stage(name: "Meteor",           threshold: 0,      visualType: .rock,      scale: 1.0),
+        Stage(name: "Asteroid",         threshold: 25,     visualType: .rock,      scale: 1.5),
+        Stage(name: "Dwarf Planet",     threshold: 80,     visualType: .ice,       scale: 2.0),
+        Stage(name: "Rocky Planet",     threshold: 200,    visualType: .lava,      scale: 2.5),
+        Stage(name: "Gas Giant",        threshold: 500,    visualType: .gas,       scale: 3.5),
+        Stage(name: "Dwarf Star",       threshold: 1200,   visualType: .star,      scale: 4.5),
+        Stage(name: "Star",             threshold: 3000,   visualType: .star,      scale: 5.5),
+        Stage(name: "Giant Star",       threshold: 6000,   visualType: .star,      scale: 7.0),
+        Stage(name: "Super Giant",      threshold: 12000,  visualType: .star,      scale: 9.0),
+        Stage(name: "Neutron Star",     threshold: 25000,  visualType: .neutron,   scale: 2.0),
+        Stage(name: "Black Hole",       threshold: 50000,  visualType: .blackHole, scale: 4.0)
+    ]
+    
+    static let winMass: Float = 60000.0
+    
+    static func getStage(mass: Float) -> Stage {
+        return stages.last { mass >= $0.threshold } ?? stages[0]
+    }
+    
+    static func getNextStage(mass: Float) -> Stage? {
+        return stages.first { mass < $0.threshold }
+    }
+    
+    static func getStageIndex(mass: Float) -> Int {
+        let stage = getStage(mass: mass)
+        return stages.firstIndex(where: { $0.threshold == stage.threshold }) ?? 0
+    }
+}
+
 enum EvoPath: Int {
     case none = 0
     // Planet tier branches (Tier 2 - mass 40+)
@@ -84,7 +123,19 @@ struct Player {
     var accelBonus: Float = 0.0
     var hasEventHorizon: Bool = false
     
+    var currentStage: Progression.Stage {
+        return Progression.getStage(mass: mass)
+    }
+    
+    var stageIndex: Int {
+        return Progression.getStageIndex(mass: mass)
+    }
+    
     mutating func updateRadius() {
-        self.radius = SimParams.radiusForMass(self.mass)
+        if mass >= 25000 && mass < 50000 {
+            self.radius = 40.0
+        } else {
+            self.radius = SimParams.radiusForMass(self.mass)
+        }
     }
 }
