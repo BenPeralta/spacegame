@@ -309,4 +309,46 @@ extension World {
     func useAbility() {
         activateAbility()
     }
+    
+    func applyUpgrade(_ upgrade: Upgrade) {
+        let currentLevel = player.activeUpgrades[upgrade.type] ?? 0
+        player.activeUpgrades[upgrade.type] = currentLevel + 1
+        
+        switch upgrade.type {
+        case .rocheLimit:
+            player.shatterRangeMultiplier += 0.5
+        case .relativisticJet:
+            player.speedBonus += 0.2
+            player.rammingDamageBonus += 0.5
+        case .hawkingRadiation:
+            player.hawkingDamage += 10.0
+        case .gammaRayBurst:
+            player.gammaBurstChance += 0.15
+        case .magnetosphere:
+            player.defenseMultiplier *= 0.8
+        case .neutroniumHull:
+            player.mass *= 1.2
+            player.updateRadius()
+            player.knockbackResist += 0.5
+            player.maxHealth *= 1.5
+            player.health = player.maxHealth
+        case .eventHorizon:
+            player.hasEventHorizon = true
+        case .darkMatterHalo:
+            player.gravityMultiplier += 0.5
+        case .nucleosynthesis:
+            player.healOnAbsorb += 5.0
+        case .orbitalResonance:
+            player.orbitDamageMultiplier += 1.0
+            for i in 0..<player.attachments.count {
+                player.attachments[i].orbitSpeed *= 2.0
+            }
+        case .escapeVelocity:
+            player.accelBonus += 0.4
+        case .gravitationalLensing:
+            player.rareSpawnChance += 0.2
+        }
+        
+        events.append(.evolve(tier: player.tier))
+    }
 }

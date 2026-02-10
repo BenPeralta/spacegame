@@ -72,6 +72,18 @@ struct Player {
     var orbiters: [Orbiter] = []  // Max 12 for perf/mobile
     var captureCooldown: Float = 0.0
     
+    // Upgrade Stats
+    var activeUpgrades: [UpgradeType: Int] = [:]
+    var shatterRangeMultiplier: Float = 1.0
+    var hawkingDamage: Float = 0.0
+    var gammaBurstChance: Float = 0.0
+    var knockbackResist: Float = 0.0
+    var healOnAbsorb: Float = 0.0
+    var orbitDamageMultiplier: Float = 1.0
+    var rareSpawnChance: Float = 0.0
+    var accelBonus: Float = 0.0
+    var hasEventHorizon: Bool = false
+    
     mutating func updateRadius() {
         self.radius = SimParams.radiusForMass(self.mass)
     }

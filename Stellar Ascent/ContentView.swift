@@ -19,8 +19,8 @@ struct ContentView: View {
                 
                 // Overlays
                 if coordinator.gameState == .levelingUp && coordinator.showEvolutionSelection {
-                    EvolutionSelectionView { path in
-                        coordinator.onPathSelect?(path)
+                    EvolutionSelectionView(options: coordinator.currentUpgradeOptions) { upgrade in
+                        coordinator.onUpgradeSelect?(upgrade)
                         withAnimation {
                             coordinator.showEvolutionSelection = false
                             coordinator.gameState = .playing
@@ -214,8 +214,9 @@ struct ContentView: View {
         coordinator.tier = "Meteor"
         coordinator.selectedPath = .none
                         coordinator.showEvolutionSelection = false
-                        coordinator.abilityCooldown = 0.0
-                        coordinator.maxAbilityCooldown = 5.0
+        coordinator.abilityCooldown = 0.0
+        coordinator.maxAbilityCooldown = 5.0
+        coordinator.currentUpgradeOptions = []
         
         // Trigger world reset via notification
         NotificationCenter.default.post(name: NSNotification.Name("RestartGame"), object: nil)

@@ -15,6 +15,8 @@ enum VisualType: Int {
     case gas = 3
     case star = 4
     case blackHole = 5
+    case trail = 6
+    case jet = 7
 }
 
 struct Entity {

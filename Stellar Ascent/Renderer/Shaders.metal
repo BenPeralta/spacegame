@@ -86,7 +86,7 @@ vertex VertexOut vertexShader(uint vertexID [[vertex_id]],
 fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uniforms [[buffer(1)]]) {
     // 1. Circle Cutout
     float dist = length(in.uv);
-    if (in.type != 6 && dist > 1.0) discard_fragment();
+    if (in.type != 6 && in.type != 7 && dist > 1.0) discard_fragment();
     
     // 2. Rotate UVs for Texture (THIS MAKES IT SPIN)
     float c = cos(in.rotation);
@@ -109,36 +109,49 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uni
 
     // 4. Procedural Textures based on Type
     if (in.type == 6) { // TRAIL
-        float core = 1.0 - smoothstep(0.0, 0.2, dist);
-        float glow = 1.0 - smoothstep(0.0, 1.0, dist);
         float noiseVal = fbm(in.uv * 2.0 - float2(0, in.time * 3.0));
+        float core = 1.0 - smoothstep(0.0, 0.2, dist);
         finalColor = in.color.rgb + float3(0.5, 0.5, 0.2) * core;
         finalColor += in.color.rgb * noiseVal * 0.5;
-        alpha = glow * in.color.a * (0.5 + noiseVal * 0.5);
+        alpha = (1.0 - smoothstep(0.0, 1.0, dist)) * in.color.a;
         light = 1.0;
-    } else if (in.type == 5) { // BLACK HOLE
-        // Accretion Disk (Bright Ring)
-        float ring = smoothstep(0.5, 0.7, dist) * (1.0 - smoothstep(0.8, 1.0, dist));
-        // Event Horizon (Black Center)
-        float horizon = 1.0 - smoothstep(0.4, 0.45, dist);
-        
-        float3 diskColor = float3(0.6, 0.1, 0.8); // Deep Purple
-        finalColor = mix(diskColor * 3.0, float3(0.0), horizon);
-        alpha = ring + horizon; // Only draw ring and center
-        light = 1.0; // Black holes don't have standard shading
-        
+    } else if (in.type == 5) { // BLACK HOLE (Polished)
+        float pulse = sin(in.time * 2.0) * 0.05;
+        float horizonRadius = 0.45 + pulse;
+        float angle = atan2(in.uv.y, in.uv.x);
+        float spiral = angle * 2.0 + in.time * 3.0;
+        float diskNoise = fbm(float2(dist * 10.0 - in.time, spiral));
+        float ring = smoothstep(0.5, 0.8, dist) * (1.0 - smoothstep(0.9, 1.0, dist));
+        ring *= (0.8 + 0.5 * diskNoise);
+        float horizon = 1.0 - smoothstep(horizonRadius - 0.05, horizonRadius, dist);
+        float3 diskColor = float3(0.6, 0.1, 0.8);
+        if (in.glow > 1.5) diskColor += float3(0.5, 0.8, 1.0);
+        finalColor = mix(diskColor * 4.0, float3(0.0), horizon);
+        alpha = ring + horizon;
+        light = 1.0;
+    } else if (in.type == 7) { // RELATIVISTIC JET
+        float core = 1.0 - smoothstep(0.0, 0.3, fabs(in.uv.y));
+        float noiseVal = fbm(in.uv * float2(1.0, 5.0) - float2(in.time * 10.0, 0.0));
+        finalColor = float3(0.4, 0.9, 1.0) * core;
+        finalColor += float3(0.8, 1.0, 1.0) * noiseVal * core;
+        alpha = core * in.color.a;
+        light = 1.0;
     } else if (in.type == 4) { // STAR
-        // Turbulent surface
-        float n = fbm(rotatedUV * 3.0 + float2(in.time * 0.2, 0.0));
-        finalColor += float3(1.0, 0.8, 0.4) * n;
-        light = 1.2; // Self-emissive
-        
-    } else if (in.type == 3) { // GAS GIANT
-        // Banded noise
-        float bands = sin(rotatedUV.y * 10.0 + fbm(rotatedUV * 5.0) * 2.0);
-        float3 bandColor = mix(in.color.rgb, in.color.rgb * 0.5, bands * 0.5 + 0.5);
-        finalColor = bandColor;
-        
+        float n = fbm(rotatedUV * 3.0 + float2(in.time * 0.5, 0.0));
+        float flares = smoothstep(0.6, 1.0, n);
+        finalColor += float3(1.0, 0.9, 0.5) * flares;
+        light = 1.2;
+    } else if (in.type == 3) { // GAS GIANT (Animated Bands)
+        float shift = in.time * 0.2;
+        float2 warp = rotatedUV;
+        warp.x += sin(rotatedUV.y * 10.0 + in.time) * 0.1;
+        float bands = sin(warp.y * 12.0 + fbm(warp * 3.0 + shift) * 3.0);
+        float stormDist = distance(rotatedUV, float2(0.3, 0.2));
+        float storm = 1.0 - smoothstep(0.15, 0.2, stormDist);
+        float3 baseColor = in.color.rgb;
+        float3 stormColor = baseColor * 0.5 + float3(0.2, 0.0, 0.0);
+        finalColor = mix(baseColor, baseColor * 0.6, bands * 0.5 + 0.5);
+        finalColor = mix(finalColor, stormColor, storm);
     } else if (in.type == 2) { // LAVA
          float n = fbm(rotatedUV * 4.0 + in.seed);
          finalColor = mix(finalColor, float3(0.1, 0.0, 0.0), n); // Dark rocks
@@ -203,6 +216,15 @@ backgroundVertexShader(uint vertexID [[vertex_id]],
     float2 camPos = -float2(uniforms.viewMatrix[3].x, uniforms.viewMatrix[3].y);
     float parallaxFactor = (1.0 - star.depth * 0.8);
     float2 parallaxPos = star.position - (camPos * parallaxFactor);
+    
+    if (uniforms.lensingStrength > 0.0) {
+        float2 toBH = parallaxPos - uniforms.blackHolePos;
+        float distBH = length(toBH);
+        distBH = max(distBH, 10.0);
+        float distortion = uniforms.lensingStrength / (distBH * 0.8);
+        distortion = min(distortion, 300.0);
+        parallaxPos += normalize(toBH) * distortion;
+    }
 
     float wrapSize = 8000.0;
     float halfSize = 4000.0;

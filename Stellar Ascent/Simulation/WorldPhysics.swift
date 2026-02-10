@@ -4,15 +4,58 @@ import simd
 // MARK: - Physics & Collisions
 extension World {
     
+    func applyHawkingRadiation(dt: Float) {
+        if player.hawkingDamage <= 0 { return }
+        
+        let burnRange = player.radius * 2.5
+        for i in 0..<entities.count {
+            if !entities[i].alive { continue }
+            let dist = distance(player.pos, entities[i].pos)
+            if dist < burnRange {
+                let burn = player.hawkingDamage * dt * (1.0 - dist / burnRange)
+                entities[i].health -= burn
+                
+                if Float.random(in: 0...1) < 0.1 {
+                    events.append(.damage(pos: entities[i].pos))
+                }
+                
+                if entities[i].health <= 0 {
+                    let debris = generateDebris(from: entities[i], impactVel: .zero)
+                    if entities.count + debris.count < 300 {
+                        entities.append(contentsOf: debris)
+                        nextEntityId += debris.count
+                    }
+                    entities[i].alive = false
+                    events.append(.shatter(pos: entities[i].pos, color: entities[i].color))
+                }
+            }
+        }
+    }
+    
+    func triggerGammaRayBurst(at pos: SIMD2<Float>) {
+        events.append(.shatter(pos: pos, color: SIMD4(1, 0.8, 0.2, 1)))
+        AudioManager.shared.playEvent("damage")
+        
+        let range: Float = 400.0
+        for i in 0..<entities.count {
+            if !entities[i].alive { continue }
+            if distance(pos, entities[i].pos) < range {
+                entities[i].vel += normalize(entities[i].pos - pos) * 800.0
+                entities[i].health -= 50.0
+            }
+        }
+    }
+    
     // MARK: Player Movement
     func applyPlayerMovement(dt: Float, input: SIMD2<Float>) {
-        let accel = input * SimParams.playerAccel
+        let accel = input * (SimParams.playerAccel * (1.0 + player.accelBonus))
         player.vel += accel * dt
         player.vel *= (1.0 - SimParams.drag)
         
         let speed = length(player.vel)
-        if speed > SimParams.playerMaxSpeed {
-            player.vel *= (SimParams.playerMaxSpeed / speed)
+        let maxSpeed = SimParams.playerMaxSpeed * (1.0 + player.speedBonus)
+        if speed > maxSpeed {
+            player.vel *= (maxSpeed / speed)
         }
         
         player.pos += player.vel * dt
@@ -61,9 +104,10 @@ extension World {
     func checkRocheLimit(targetIndex: Int) {
         let e = entities[targetIndex]
         let dist = distance(player.pos, e.pos)
-        let rocheLimit = player.radius * 2.5
+        let baseLimit = player.radius * 1.5
+        let rocheLimit = baseLimit * player.shatterRangeMultiplier
         
-        if dist < rocheLimit && e.mass < player.mass * 0.1 {
+        if dist < rocheLimit && e.mass < player.mass * 0.2 {
             let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.1)
             if entities.count + debris.count < 300 {
                 entities.append(contentsOf: debris)
@@ -110,6 +154,14 @@ extension World {
                 return
             }
             
+            // Event Horizon upgrade
+            if player.hasEventHorizon && e.mass < player.mass * 0.1 {
+                player.mass += e.mass
+                player.updateRadius()
+                entities[targetIndex].alive = false
+                return
+            }
+            
             // Spin physics (Unchanged)
             let normal = normalize(player.pos - e.pos)
             let tangent = SIMD2<Float>(-normal.y, normal.x)
@@ -140,7 +192,11 @@ extension World {
                 
                 player.mass += e.mass
                 player.updateRadius()
-                player.health = min(player.health + e.mass * 0.1, player.maxHealth)
+                if player.healOnAbsorb > 0 {
+                    player.health = min(player.maxHealth, player.health + player.healOnAbsorb)
+                } else {
+                    player.health = min(player.health + e.mass * 0.1, player.maxHealth)
+                }
                 entities[targetIndex].alive = false
                 events.append(.absorb(pos: e.pos, color: e.color))
                 AudioManager.shared.playEvent("absorb")
@@ -180,6 +236,9 @@ extension World {
                 }
                 
                 if impactSpeed > 100 || massRatio < 0.5 {
+                    if player.gammaBurstChance > 0, Float.random(in: 0...1) < player.gammaBurstChance {
+                        triggerGammaRayBurst(at: (player.pos + e.pos) * 0.5)
+                    }
                     let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.5)
                     if entities.count + debris.count < 300 {
                         entities.append(contentsOf: debris)

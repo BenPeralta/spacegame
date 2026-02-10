@@ -1,61 +1,33 @@
 import SwiftUI
 
 struct EvolutionSelectionView: View {
-    let onSelect: (EvoPath) -> Void
+    let options: [Upgrade]
+    let onSelect: (Upgrade) -> Void
     
     var body: some View {
         ZStack {
-            Color.black.opacity(0.90).edgesIgnoringSafeArea(.all)
+            Color.black.opacity(0.85).edgesIgnoringSafeArea(.all)
             
-            VStack(spacing: 25) {
-                Text("STELLAR EVOLUTION")
-                    .font(.custom("AvenirNext-Heavy", size: 36))
+            VStack(spacing: 30) {
+                Text("COSMIC EVOLUTION")
+                    .font(.custom("AvenirNext-Heavy", size: 32))
                     .foregroundColor(.white)
-                    .shadow(color: .blue, radius: 15)
+                    .shadow(color: .purple, radius: 20)
                 
-                Text("Select your cosmic destiny")
-                    .font(.subheadline)
-                    .foregroundColor(.gray)
-                
-                HStack(spacing: 15) {
-                    ChoiceCard(
-                        title: "Zero Kelvin Crust",
-                        desc: "Develop an impenetrable ice shell.\nDefense +50%",
-                        icon: "snowflake",
-                        color: Color(red: 0.4, green: 0.8, blue: 1.0)
-                    ) {
-                        onSelect(.frozenFortress)
-                    }
-                    
-                    ChoiceCard(
-                        title: "Accretion Disk",
-                        desc: "Generate intense gravity to pull matter.\nPull range +200%",
-                        icon: "tornado",
-                        color: Color(red: 0.2, green: 0.9, blue: 0.4)
-                    ) {
-                        onSelect(.cradleOfLife)
-                    }
-                    
-                    ChoiceCard(
-                        title: "Stellar Ignition",
-                        desc: "Burn nearby enemies on contact.\nContact Damage +300%",
-                        icon: "flame.fill",
-                        color: Color(red: 1.0, green: 0.3, blue: 0.1)
-                    ) {
-                        onSelect(.warPlanet)
+                HStack(spacing: 20) {
+                    ForEach(0..<options.count, id: \.self) { i in
+                        UpgradeCard(upgrade: options[i]) {
+                            onSelect(options[i])
+                        }
                     }
                 }
-                .padding()
             }
         }
     }
 }
 
-struct ChoiceCard: View {
-    let title: String
-    let desc: String
-    let icon: String
-    let color: Color
+struct UpgradeCard: View {
+    let upgrade: Upgrade
     let action: () -> Void
     
     @State private var isHovered = false
@@ -63,40 +35,59 @@ struct ChoiceCard: View {
     var body: some View {
         Button(action: action) {
             VStack(spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(color.opacity(0.2))
-                        .frame(width: 60, height: 60)
-                    Image(systemName: icon)
-                        .font(.system(size: 30))
-                        .foregroundColor(color)
-                }
+                Circle()
+                    .fill(upgrade.color.opacity(0.2))
+                    .frame(width: 70, height: 70)
+                    .overlay(
+                        Image(systemName: upgrade.icon)
+                            .font(.system(size: 35))
+                            .foregroundColor(upgrade.color)
+                    )
+                    .shadow(color: upgrade.color, radius: isHovered ? 20 : 5)
                 
-                Text(title)
-                    .font(.system(size: 18, weight: .bold, design: .rounded))
+                Text(upgrade.name)
+                    .font(.system(size: 16, weight: .bold, design: .rounded))
                     .foregroundColor(.white)
                     .multilineTextAlignment(.center)
+                    .frame(height: 40)
                 
-                Text(desc)
-                    .font(.system(size: 12, weight: .medium))
+                Text(upgrade.description)
+                    .font(.system(size: 11, weight: .medium))
                     .foregroundColor(.gray)
                     .multilineTextAlignment(.center)
-                    .padding(.horizontal, 5)
+                    .frame(height: 50)
+                
+                Text(rarityString(upgrade.rarity))
+                    .font(.caption2)
+                    .fontWeight(.bold)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(upgrade.color.opacity(0.2))
+                    .cornerRadius(8)
+                    .foregroundColor(upgrade.color)
             }
-            .padding(20)
-            .frame(width: 170, height: 260)
+            .padding()
+            .frame(width: 160, height: 260)
             .background(
-                RoundedRectangle(cornerRadius: 20)
-                    .fill(Color(white: 0.1))
+                RoundedRectangle(cornerRadius: 16)
+                    .fill(Color(white: 0.12))
                     .overlay(
-                        RoundedRectangle(cornerRadius: 20)
-                            .stroke(color, lineWidth: isHovered ? 4 : 1)
+                        RoundedRectangle(cornerRadius: 16)
+                            .stroke(upgrade.color.opacity(isHovered ? 1.0 : 0.3), lineWidth: 2)
                     )
-                    .shadow(color: color.opacity(0.4), radius: isHovered ? 20 : 0)
             )
+            .scaleEffect(isHovered ? 1.05 : 1.0)
+            .animation(.spring(), value: isHovered)
         }
         .buttonStyle(PlainButtonStyle())
-        .scaleEffect(isHovered ? 1.05 : 1.0)
-        .animation(.spring(response: 0.3), value: isHovered)
+    }
+    
+    func rarityString(_ r: Upgrade.Rarity) -> String {
+        switch r {
+        case .common: return "COMMON"
+        case .rare: return "RARE"
+        case .epic: return "EPIC"
+        case .legendary: return "LEGENDARY"
+        }
     }
 }

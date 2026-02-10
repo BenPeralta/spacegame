@@ -22,6 +22,8 @@ struct Uniforms {
     var time: Float
     var screenSize: SIMD2<Float>
     var flashIntensity: Float
+    var blackHolePos: SIMD2<Float>
+    var lensingStrength: Float
 }
 
 private func makeOrtho(left: Float, right: Float, bottom: Float, top: Float, near: Float, far: Float) -> simd_float4x4 {
@@ -68,6 +70,10 @@ class Renderer: NSObject, MTKViewDelegate {
     var zoom: Float = 1.0
     var simTime: Float = 0.0
     var flashIntensity: Float = 0.0
+    var playerPos: SIMD2<Float> = .zero
+    var playerRadius: Float = 0.0
+    var playerType: Int32 = 0
+    var activeUpgrades: [String: Bool] = [:]
     
     init?(metalKitView: MTKView) {
         super.init()
@@ -111,19 +117,34 @@ class Renderer: NSObject, MTKViewDelegate {
     }
     
     // MARK: - Update Data (Called from Game Loop)
-    func update(instances: [InstanceData], camera: SIMD2<Float>, zoom: Float, time: Float, flashIntensity: Float, playerVel: SIMD2<Float>, playerPos: SIMD2<Float>) {
+    func update(instances: [InstanceData], camera: SIMD2<Float>, zoom: Float, time: Float, flashIntensity: Float, playerVel: SIMD2<Float>, playerPos: SIMD2<Float>, playerRadius: Float, playerType: Int32, activeUpgrades: [String: Bool]) {
         self.cameraPos = camera
         self.zoom = zoom
         self.simTime = time
         self.flashIntensity = flashIntensity
+        self.playerPos = playerPos
+        self.playerRadius = playerRadius
+        self.playerType = playerType
+        self.activeUpgrades = activeUpgrades
         
-        // Auto trail
         let speed = length(playerVel)
-        if speed > 50.0 {
-            let dir = normalize(playerVel)
-            let trailPos = playerPos - (dir * 30.0)
-            let trailDir = -dir
-            particleSystem?.emit(pos: trailPos, count: 2, color: .zero, speed: speed, type: "trail", direction: trailDir)
+        let dir = speed > 0.1 ? normalize(playerVel) : SIMD2<Float>(0, 1)
+        
+        if activeUpgrades["Relativistic Jet"] == true && speed > 50.0 {
+            let jetDir = -dir
+            let jetStart = playerPos + jetDir * (playerRadius * 0.8)
+            particleSystem?.emit(pos: jetStart, count: 5, color: .zero, speed: 800.0, type: "jet", direction: jetDir, spread: 0.1)
+        }
+        
+        if activeUpgrades["Dark Matter Halo"] == true {
+            if Float.random(in: 0...1) < 0.3 {
+                particleSystem?.emit(pos: playerPos, count: 1, color: .zero, speed: 0, type: "darkMatter")
+            }
+        }
+        
+        if speed > 50.0 && activeUpgrades["Relativistic Jet"] != true {
+            let trailPos = playerPos - (dir * playerRadius * 0.6)
+            particleSystem?.emit(pos: trailPos, count: 2, color: .zero, speed: speed * 0.2, type: "trail", direction: -dir)
         }
         
         // Merge Particles (Draw particles BEHIND entities)
@@ -187,12 +208,25 @@ class Renderer: NSObject, MTKViewDelegate {
         let halfH = (viewportSize.y * 0.5) / zoom
         let projection = makeOrtho(left: -halfW, right: halfW, bottom: -halfH, top: halfH, near: -1.0, far: 1.0)
         let view = makeTranslation(SIMD3<Float>(-cameraPos.x, -cameraPos.y, 0))
+        var lensingStrength: Float = 0.0
+        if playerRadius > 300.0 {
+            lensingStrength = playerRadius * 2.0
+        }
+        if playerType == 5 {
+            lensingStrength = max(lensingStrength, playerRadius * 8.0)
+        }
+        if activeUpgrades["Dark Matter Halo"] == true {
+            lensingStrength = max(lensingStrength, playerRadius * 4.0)
+        }
+        
         var uniforms = Uniforms(
             projectionMatrix: projection,
             viewMatrix: view,
             time: simTime,
             screenSize: viewportSize,
-            flashIntensity: flashIntensity
+            flashIntensity: flashIntensity,
+            blackHolePos: playerPos,
+            lensingStrength: lensingStrength
         )
         
         encoder?.setVertexBytes(&uniforms, length: MemoryLayout<Uniforms>.stride, index: 1)

@@ -26,6 +26,7 @@ class GameCoordinator: ObservableObject {
     @Published var selectedPath: EvoPath = .none
     @Published var abilityCooldown: Float = 0.0
     @Published var maxAbilityCooldown: Float = 5.0
+    @Published var currentUpgradeOptions: [Upgrade] = []
     
     var inputVector: SIMD2<Float> = .zero
     var capturePressed: Bool = false  // Manual orbit capture
@@ -33,6 +34,7 @@ class GameCoordinator: ObservableObject {
     // Actions
     var onAbilityPress: (() -> Void)?
     var onPathSelect: ((EvoPath) -> Void)?
+    var onUpgradeSelect: ((Upgrade) -> Void)?
     var onStartGame: (() -> Void)?
     var onQuitGame: (() -> Void)?
 }
@@ -99,6 +101,10 @@ class GameViewController: UIViewController {
             // Game state is set to .playing in SwiftUI view
         }
         
+        coordinator.onUpgradeSelect = { [weak self] upgrade in
+            self?.world.applyUpgrade(upgrade)
+        }
+        
         coordinator.onStartGame = { [weak self] in
             self?.restartGame() // Ensure fresh start
         }
@@ -109,8 +115,11 @@ class GameViewController: UIViewController {
         
         // World Callbacks
         world.onEvolutionTrigger = { [weak self] in
+            let tier = self?.world.player.tier ?? 0
+            let options = UpgradePool.shared.getOptions(for: tier)
             DispatchQueue.main.async {
                 self?.coordinator?.showEvolutionSelection = true
+                self?.coordinator?.currentUpgradeOptions = options
                 self?.coordinator?.gameState = .levelingUp
             }
         }
@@ -142,9 +151,16 @@ class GameViewController: UIViewController {
                  // Render last frame without update
                  let instances = world.getRenderInstances()
                  let camera = world.player.pos
-                 let targetZoom = 100.0 / (world.player.radius + 60.0)
+                 let baseScale: Float = 100.0
+                 var radiusPadding: Float = 60.0
+                 if world.player.tier >= 5 {
+                     radiusPadding = 400.0
+                 }
+                 let targetZoom = baseScale / (world.player.radius + radiusPadding)
                  let zoom: Float = max(0.15, min(2.0, targetZoom))
-                 renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos)
+                 let flags = buildVisualFlags()
+                 let playerType: Int32 = world.player.tier >= 5 ? 5 : (world.player.tier >= 4 ? 4 : (world.player.tier >= 3 ? 3 : 0))
+                 renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos, playerRadius: world.player.radius, playerType: playerType, activeUpgrades: flags)
             }
             return
         }
@@ -235,10 +251,17 @@ class GameViewController: UIViewController {
         // zoom = 1.0 means 1 unit = 1 pixel (roughly, depending on projection)
         // Dynamic Zoom: As player grows, zoom out to show more world
         // Base Scale: 80.0 / (Radius + 40.0) -> Start ~ 1.33, End ~ 0.1
-        let targetZoom = 100.0 / (world.player.radius + 60.0)
+        let baseScale: Float = 100.0
+        var radiusPadding: Float = 60.0
+        if world.player.tier >= 5 {
+            radiusPadding = 400.0
+        }
+        let targetZoom = baseScale / (world.player.radius + radiusPadding)
         let zoom: Float = max(0.15, min(2.0, targetZoom))
         
-        renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos)
+        let flags = buildVisualFlags()
+        let playerType: Int32 = world.player.tier >= 5 ? 5 : (world.player.tier >= 4 ? 4 : (world.player.tier >= 3 ? 3 : 0))
+        renderer.update(instances: instances, camera: camera, zoom: zoom, time: world.time, flashIntensity: world.flashIntensity, playerVel: world.player.vel, playerPos: world.player.pos, playerRadius: world.player.radius, playerType: playerType, activeUpgrades: flags)
     }
     
     // MARK: - Restart
@@ -269,6 +292,14 @@ class GameViewController: UIViewController {
         let generator = UIImpactFeedbackGenerator(style: style)
         generator.prepare()
         generator.impactOccurred()
+    }
+
+    func buildVisualFlags() -> [String: Bool] {
+        var flags: [String: Bool] = [:]
+        for (type, _) in world.player.activeUpgrades {
+            flags[type.rawValue] = true
+        }
+        return flags
     }
 }
 

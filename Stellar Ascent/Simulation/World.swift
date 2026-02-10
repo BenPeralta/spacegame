@@ -156,6 +156,7 @@ class World {
         
         // Entity interactions
         resolveEntityCollisions()
+        applyHawkingRadiation(dt: dt)
         
         // Physics Interactions (Candidates only)
         for idx in gravityCandidates {
@@ -196,7 +197,7 @@ class World {
                 velocity: player.vel,
                 radius: player.radius,
                 color: player.color,
-                glowIntensity: player.evoPath == .none ? 0.0 : (1.0 + Float(player.tier) * 0.2),
+                glowIntensity: player.evoPath == .none ? 0.0 : (1.0 + Float(player.tier) * 0.2) + (player.hawkingDamage > 0 ? (0.5 + sin(time * 10.0) * 0.2) : 0.0),
                 seed: 0.123,
                 crackColor: player.crackColor,
                 crackIntensity: player.crackIntensity + Float(player.tier) * 0.15,
@@ -204,6 +205,22 @@ class World {
                 type: Int32(playerType.rawValue),
                 time: time
             ))
+            
+            if player.defenseMultiplier < 0.8 {
+                instances.append(InstanceData(
+                    position: player.pos,
+                    velocity: player.vel,
+                    radius: player.radius * 1.2,
+                    color: SIMD4<Float>(0.0, 0.5, 1.0, 0.2),
+                    glowIntensity: 1.0,
+                    seed: 0,
+                    crackColor: .zero,
+                    crackIntensity: 0.0,
+                    rotation: -player.rotation,
+                    type: Int32(VisualType.trail.rawValue),
+                    time: time
+                ))
+            }
             
             // Player Attachments
             for att in player.attachments {

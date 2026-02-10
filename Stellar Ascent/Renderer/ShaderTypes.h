@@ -11,7 +11,8 @@ enum EntityVisualType {
     VisualTypeGas = 3,
     VisualTypeStar = 4,
     VisualTypeBlackHole = 5,
-    VisualTypeTrail = 6
+    VisualTypeTrail = 6,
+    VisualTypeJet = 7
 };
 
 struct InstanceData {
@@ -36,6 +37,9 @@ struct Uniforms {
     float time;
     vector_float2 screenSize;
     float flashIntensity;
+    
+    vector_float2 blackHolePos;
+    float lensingStrength;
 };
 
 #endif /* ShaderTypes_h */

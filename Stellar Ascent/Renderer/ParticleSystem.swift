@@ -49,7 +49,7 @@ class ParticleSystem {
         }
     }
     
-    func emit(pos: SIMD2<Float>, count: Int, color: SIMD4<Float>, speed: Float, type: String, direction: SIMD2<Float> = .zero) {
+    func emit(pos: SIMD2<Float>, count: Int, color: SIMD4<Float>, speed: Float, type: String, direction: SIMD2<Float> = .zero, spread: Float = 1.0) {
         if particles.count + count > maxParticles { return }
         
         for _ in 0..<count {
@@ -64,7 +64,31 @@ class ParticleSystem {
             )
             
             // Custom behavior based on type
-            if type == "absorb" {
+            if type == "jet" {
+                p.color = SIMD4<Float>(0.2, 0.8, 1.0, 1.0)
+                let angleOffset = Float.random(in: -0.2...0.2) * spread
+                let c = cos(angleOffset)
+                let s = sin(angleOffset)
+                let rotatedDir = SIMD2<Float>(
+                    direction.x * c - direction.y * s,
+                    direction.x * s + direction.y * c
+                )
+                p.position = pos + rotatedDir * Float.random(in: 0...10)
+                p.velocity = rotatedDir * speed * Float.random(in: 1.0...1.5)
+                p.size = Float.random(in: 10...20)
+                p.life = Float.random(in: 0.2...0.4)
+                p.type = 7
+            } else if type == "darkMatter" {
+                p.color = SIMD4<Float>(0.2, 0.0, 0.4, 0.5)
+                let angle = Float.random(in: 0...Float.pi * 2)
+                let dist = Float.random(in: 50...150)
+                let offset = SIMD2<Float>(cos(angle), sin(angle)) * dist
+                p.position = pos + offset
+                p.velocity = offset * 0.1
+                p.size = Float.random(in: 30...50)
+                p.life = Float.random(in: 1.0...2.0)
+                p.type = 6
+            } else if type == "absorb" {
                 let angle = Float.random(in: 0...Float.pi * 2)
                 let velDir = SIMD2<Float>(cos(angle), sin(angle))
                 p.velocity = velDir * Float.random(in: 50...150)
@@ -80,8 +104,8 @@ class ParticleSystem {
                     p.velocity = normalize(direction) * speed * 0.1
                 }
                 p.velocity += SIMD2<Float>(Float.random(in: -10...10), Float.random(in: -10...10))
-                p.size = Float.random(in: 12...22)
-                p.life = Float.random(in: 0.2...0.4)
+                p.size = Float.random(in: 20...35)
+                p.life = Float.random(in: 0.3...0.6)
                 p.type = 6
             }
             
