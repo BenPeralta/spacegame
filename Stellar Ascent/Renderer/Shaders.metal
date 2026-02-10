@@ -161,13 +161,33 @@ fragment float4 fragmentShader(VertexOut in [[stage_in]], constant Uniforms &uni
         finalColor += float3(0.5, 1.0, 1.0) * beam * beamMask * 2.0;
         
         light = 1.0;
-    } else if (in.type == 4) { // STAR
-        float n = fbm(rotatedUV * 3.0 + float2(in.time * 0.2, 0.0));
-        float flares = smoothstep(0.6, 1.0, n);
+    } else if (in.type == 9) { // DWARF STAR (Concentrated Power - Golden Mini Sun)
+        // Core: Sharp, intense
+        float core = 1.0 - smoothstep(0.0, 0.7, dist);
+        float3 base = in.color.rgb; // Golden Yellow
+        
+        // Fast, energetic surface noise
+        float n = fbm(rotatedUV * 6.0 - float2(in.time * 0.8, in.time * 0.4));
+        float spots = smoothstep(0.3, 0.8, n);
+        
+        // Blindingly hot highlights
+        float3 surface = mix(base, float3(1.0, 0.9, 0.8), spots * 0.8);
+        
+        // Corona / Rim
+        float corona = smoothstep(0.8, 1.0, dist) * (1.0 - smoothstep(1.2, 1.5, dist));
+        
+        finalColor = surface + float3(1.0, 0.9, 0.3) * core * 1.5;
+        finalColor += float3(1.0, 0.7, 0.1) * corona * 2.0;
+        
+        light = 2.0; // Very bright
+    } else if (in.type == 4) { // STAR (Improved - White)
+        float core = 1.0 - smoothstep(0.0, 0.9, dist);
         float3 base = in.color.rgb;
-        float3 hot = mix(base, float3(1.0, 1.0, 1.0), 0.5);
-        finalColor = base + hot * flares;
-        light = 1.2;
+        float n = fbm(rotatedUV * 4.0 - float2(in.time * 0.1, in.time * 0.2));
+        float spots = smoothstep(0.4, 0.7, n);
+        float3 surface = mix(base, float3(0.9, 0.95, 1.0), spots * 0.5);
+        finalColor = surface + float3(0.9, 0.95, 1.0) * core * 0.8;
+        light = 1.5;
     } else if (in.type == 3) { // GAS GIANT (Animated Bands)
         float shift = in.time * 0.2;
         float2 warp = rotatedUV;

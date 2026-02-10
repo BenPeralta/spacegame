@@ -1,4 +1,5 @@
 import AVFoundation
+import QuartzCore
 import UIKit
 
 class AudioManager {
@@ -9,6 +10,8 @@ class AudioManager {
     private let impactMedium = UIImpactFeedbackGenerator(style: .medium)
     private let impactHeavy = UIImpactFeedbackGenerator(style: .heavy)
     private let notification = UINotificationFeedbackGenerator()
+    private var lastLightHapticTime: CFTimeInterval = 0
+    private var lastHeavyHapticTime: CFTimeInterval = 0
     
     // Audio Players
     // var bgmPlayer: AVAudioPlayer?
@@ -38,12 +41,28 @@ class AudioManager {
     }
     
     func playHaptic(style: UIImpactFeedbackGenerator.FeedbackStyle) {
+        let now = CACurrentMediaTime()
         switch style {
-        case .light: impactLight.impactOccurred()
-        case .medium: impactMedium.impactOccurred()
-        case .heavy: impactHeavy.impactOccurred()
-        case .soft: impactLight.impactOccurred() // Fallback
-        case .rigid: impactHeavy.impactOccurred() // Fallback
+        case .light:
+            if now - lastLightHapticTime < 0.12 { return }
+            lastLightHapticTime = now
+            impactLight.impactOccurred()
+        case .medium:
+            if now - lastLightHapticTime < 0.12 { return }
+            lastLightHapticTime = now
+            impactMedium.impactOccurred()
+        case .heavy:
+            if now - lastHeavyHapticTime < 0.20 { return }
+            lastHeavyHapticTime = now
+            impactHeavy.impactOccurred()
+        case .soft:
+            if now - lastLightHapticTime < 0.12 { return }
+            lastLightHapticTime = now
+            impactLight.impactOccurred() // Fallback
+        case .rigid:
+            if now - lastHeavyHapticTime < 0.20 { return }
+            lastHeavyHapticTime = now
+            impactHeavy.impactOccurred() // Fallback
         @unknown default: break
         }
     }

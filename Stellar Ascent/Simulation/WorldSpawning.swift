@@ -14,44 +14,12 @@ extension World {
     }
     
     func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 600, maxRange: Float = 1400, forceSmall: Bool = false, scaledTo: Float? = nil) {
-        var pos = SIMD2<Float>.zero
-        var radius: Float = 10.0
-        var valid = false
-        
-        for _ in 0..<10 {
-            let angle = Float.random(in: 0...Float.pi * 2)
-            let dist = Float.random(in: minRange...maxRange)
-            let offset = SIMD2<Float>(cos(angle) * dist, sin(angle) * dist)
-            pos = center + offset
-            
-            radius = 150.0
-            
-            var overlap = false
-            for e in entities {
-                if !e.alive { continue }
-                let spacing = max(200.0, e.radius * 3.0)
-                if distance(e.pos, pos) < (e.radius + radius + spacing) {
-                    overlap = true
-                    break
-                }
-            }
-            
-            if !overlap {
-                valid = true
-                break
-            }
-        }
-        
-        if !valid { return }
-        
-        if Float.random(in: 0...1) < 0.3 {
-            spawnCluster(at: pos)
-            return
-        }
-        
         // GIANT IMPACTS: Rogue asteroids on collision course
         let rogueChance: Float = player.mass < 600 ? 0.05 : 0.03
-        let isRogue = Float.random(in: 0...1) < rogueChance
+        var isRogue = Float.random(in: 0...1) < rogueChance
+        if scaledTo != nil {
+            isRogue = false
+        }
         
         let roll = Float.random(in: 0...100)
         var mass: Float = 1.0
@@ -118,6 +86,44 @@ extension World {
             mass = Float.random(in: 200...600)
             kind = .hazard
             baseColor = SIMD4<Float>(0.9, 0.6, 0.3, 1.0)
+        }
+
+        var radius = SimParams.radiusForMass(mass, kind: kind)
+        var pos = SIMD2<Float>.zero
+        var valid = false
+        
+        for _ in 0..<10 {
+            let angle = Float.random(in: 0...Float.pi * 2)
+            let dist = Float.random(in: minRange...maxRange)
+            let offset = SIMD2<Float>(cos(angle) * dist, sin(angle) * dist)
+            pos = center + offset
+            
+            var overlap = false
+            let minPlayerDist = player.radius + radius + 150.0
+            if distance(player.pos, pos) < minPlayerDist {
+                overlap = true
+            } else {
+                for e in entities {
+                    if !e.alive { continue }
+                    let spacing = max(200.0, max(e.radius, radius) * 3.0)
+                    if distance(e.pos, pos) < (e.radius + radius + spacing) {
+                        overlap = true
+                        break
+                    }
+                }
+            }
+            
+            if !overlap {
+                valid = true
+                break
+            }
+        }
+        
+        if !valid { return }
+        
+        if Float.random(in: 0...1) < 0.3 {
+            spawnCluster(at: pos)
+            return
         }
         
         let colorVar: Float

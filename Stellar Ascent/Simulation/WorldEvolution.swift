@@ -200,9 +200,9 @@ extension World {
         case "Gas Giant":
             player.color = SIMD4<Float>(0.9, 0.7, 0.5, 1.0)
         case "Dwarf Star":
-            player.color = SIMD4<Float>(1.0, 0.2, 0.1, 1.0)
+            player.color = SIMD4<Float>(1.0, 0.8, 0.1, 1.0)
         case "Star":
-            player.color = SIMD4<Float>(1.0, 0.9, 0.4, 1.0)
+            player.color = SIMD4<Float>(0.95, 0.98, 1.0, 1.0)
         case "Giant Star":
             player.color = SIMD4<Float>(0.2, 0.6, 1.0, 1.0)
         case "Super Giant":

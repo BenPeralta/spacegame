@@ -71,8 +71,9 @@ class World {
             }
         }
         
-        // Despawn Far Entities
-        let despawnDist: Float = 2000.0
+        // Despawn Far Entities (scale with view to prevent flicker)
+        let viewRadius = (player.radius + 60.0) * 3.5
+        let despawnDist: Float = max(2500.0, viewRadius * 2.2)
         for i in 0..<entities.count {
             if entities[i].alive {
                 if distance(entities[i].pos, player.pos) > despawnDist {
@@ -87,8 +88,8 @@ class World {
         
         if activeCount < targetCount {
             // Spawn strictly outside the view radius to avoid pop-in
-            let viewRadius = (player.radius + 60.0) * 3.0
-            let minR = max(viewRadius, 900.0)
+            let viewRadius = (player.radius + 60.0) * 3.5
+            let minR = max(viewRadius * 1.1, player.radius * 4.0, 900.0)
             let maxR = minR + 1200.0
             
             // 30% chance to spawn level-appropriate food/threats

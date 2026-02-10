@@ -13,7 +13,8 @@ enum EntityVisualType {
     VisualTypeBlackHole = 5,
     VisualTypeTrail = 6,
     VisualTypeJet = 7,
-    VisualTypeNeutron = 8
+    VisualTypeNeutron = 8,
+    VisualTypeDwarfStar = 9
 };
 
 struct InstanceData {

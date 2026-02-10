@@ -70,7 +70,9 @@ extension World {
         let r = player.pos - entities[targetIndex].pos
         let dist = length(r)
         
-        let effectiveRange = SimParams.influenceRadius * player.gravityMultiplier
+        // Dynamic Gravity Range: Grow with the player so stars can pull from afar
+        let effectiveRange = max(SimParams.influenceRadius, player.radius * 6.0)
+        
         if dist < 1.0 || dist > effectiveRange { return }
         
         let dir = r / dist
@@ -223,8 +225,13 @@ extension World {
                     player.health = min(player.health + e.mass * 0.1, player.maxHealth)
                 }
                 entities[targetIndex].alive = false
-                events.append(.absorb(pos: e.pos, color: e.color))
-                AudioManager.shared.playEvent("absorb")
+                if e.mass > 5.0 {
+                    events.append(.shatter(pos: e.pos, color: e.color))
+                    AudioManager.shared.playEvent("shatter")
+                } else {
+                    events.append(.absorb(pos: e.pos, color: e.color))
+                    AudioManager.shared.playEvent("absorb")
+                }
             } else {
                 if massRatio > 1.2 && impactSpeed > 150 {
                     events.append(.shatter(pos: player.pos, color: player.color))
@@ -298,8 +305,14 @@ extension World {
                     entities[i].spin -= torque / mi
                     entities[j].spin += torque / mj
                     
-                    if impactSpeed > 200 {
-                        if mi > mj {
+                    let biggerMass = max(mi, mj)
+                    let smallerMass = min(mi, mj)
+                    let massRatioSmall = smallerMass / max(0.001, biggerMass)
+                    let deepOverlap = dist < combinedRadius * 0.7
+                    let shouldShatter = impactSpeed > 160 || massRatioSmall < 0.45 || (deepOverlap && impactSpeed > 60)
+                    
+                    if shouldShatter {
+                        if mi >= mj {
                             let debris = generateDebris(from: entities[j], impactVel: entities[i].vel * 0.5)
                             newDebris.append(contentsOf: debris)
                             entities[j].alive = false

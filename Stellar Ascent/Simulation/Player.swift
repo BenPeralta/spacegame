@@ -16,7 +16,7 @@ struct Progression {
         Stage(name: "Dwarf Planet",     threshold: 80,     visualType: .ice,       scale: 2.0),
         Stage(name: "Rocky Planet",     threshold: 200,    visualType: .lava,      scale: 2.5),
         Stage(name: "Gas Giant",        threshold: 500,    visualType: .gas,       scale: 3.5),
-        Stage(name: "Dwarf Star",       threshold: 1200,   visualType: .star,      scale: 4.5),
+        Stage(name: "Dwarf Star",       threshold: 1200,   visualType: .dwarfStar, scale: 2.8),
         Stage(name: "Star",             threshold: 3000,   visualType: .star,      scale: 5.5),
         Stage(name: "Giant Star",       threshold: 6000,   visualType: .star,      scale: 7.0),
         Stage(name: "Super Giant",      threshold: 12000,  visualType: .star,      scale: 9.0),

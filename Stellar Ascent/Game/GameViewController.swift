@@ -276,8 +276,13 @@ class GameViewController: UIViewController {
     
     // MARK: - Helpers
     func createExplosion(at pos: SIMD2<Float>, color: SIMD4<Float>) {
-        // Use renderer's existing handleEvent
-        renderer.handleEvent(type: "damage", pos: pos, color: color)
+        // Scale explosion intensity with player mass
+        let mass = world.player.mass
+        let intensity = min(3.5, max(1.0, mass / 800.0))
+        let count = Int(20.0 * intensity)
+        let speed = 300.0 * sqrt(intensity)
+        
+        renderer.particleSystem?.emit(pos: pos, count: count, color: color, speed: Float(speed), type: "absorb")
         AudioManager.shared.playEvent("damage")
     }
     
