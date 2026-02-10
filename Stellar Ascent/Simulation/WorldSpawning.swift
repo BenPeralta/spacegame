@@ -13,7 +13,7 @@ extension World {
         }
     }
     
-    func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 600, maxRange: Float = 1400) {
+    func spawnRandomEntity(near center: SIMD2<Float> = .zero, minRange: Float = 600, maxRange: Float = 1400, forceSmall: Bool = false) {
         var pos = SIMD2<Float>.zero
         var radius: Float = 10.0
         var valid = false
@@ -58,7 +58,11 @@ extension World {
         var kind: EntityKind = .matter
         var baseColor: SIMD4<Float> = SIMD4<Float>(0.8, 0.4, 0.9, 1.0)
         
-        if isRogue {
+        if forceSmall {
+            mass = Float.random(in: 3...15)
+            kind = .matter
+            baseColor = SIMD4<Float>(0.55, 0.5, 0.45, 1.0)
+        } else if isRogue {
             // Rogue asteroids
             kind = .hazard
             if player.mass < 600 {

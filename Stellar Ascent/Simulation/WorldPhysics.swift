@@ -168,9 +168,10 @@ extension World {
             let torque = dot(relVel, tangent) * 0.05
             player.spin += torque / player.mass
             
+            let absorbLimit: Float = 0.60
             let shatterThreshold: Float = 550.0
             
-            if massRatio <= SimParams.absorbRatio && impactSpeed < shatterThreshold {
+            if massRatio <= absorbLimit && impactSpeed < shatterThreshold {
                 if !player.isCompact && player.attachments.count < 30 {
                     let relativePos = e.pos - player.pos
                     let angle = atan2(relativePos.y, relativePos.x)
@@ -239,14 +240,22 @@ extension World {
                     if player.gammaBurstChance > 0, Float.random(in: 0...1) < player.gammaBurstChance {
                         triggerGammaRayBurst(at: (player.pos + e.pos) * 0.5)
                     }
-                    let debris = generateDebris(from: entities[targetIndex], impactVel: player.vel * 0.5)
+                    let dustMass = e.mass * 0.25
+                    player.mass += dustMass
+                    player.updateRadius()
+                    
+                    var tempEntity = entities[targetIndex]
+                    tempEntity.mass = e.mass * 0.75
+                    
+                    let debris = generateDebris(from: tempEntity, impactVel: player.vel * 0.5)
                     if entities.count + debris.count < 300 {
                         entities.append(contentsOf: debris)
                         nextEntityId += debris.count
                     }
                     entities[targetIndex].alive = false
                     events.append(.shatter(pos: e.pos, color: e.color))
-                    player.vel *= 0.95
+                    AudioManager.shared.playEvent("damage")
+                    player.vel *= 0.9
                 }
             }
         }

@@ -87,7 +87,11 @@ class World {
         if activeCount < 60 + Int(difficulty * 40) {
             let minR: Float = 700 + difficulty * 200
             let maxR: Float = 1400 + difficulty * 500
-            spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR)
+            if Float.random(in: 0...1) < 0.4 {
+                spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR, forceSmall: true)
+            } else {
+                spawnRandomEntity(near: player.pos, minRange: minR, maxRange: maxR)
+            }
         }
         
         // More giants late-game to prevent AFK win
